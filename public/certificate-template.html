@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Certificate of Participation</title>
+    <style>
+        @page {
+            size: landscape;
+            margin: 0;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        .certificate-container {
+            width: 1200px;
+            height: 800px;
+            background: #ffffff;
+            display: flex;
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 120px;
+            background-color: #1a237e;
+            position: relative;
+            height: 100%;
+            border-top-left-radius: 20px;
+            border-bottom-left-radius: 20px;
+            overflow: hidden;
+        }
+
+        /* Shapes */
+        .shape {
+            position: absolute;
+            transform-origin: center;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .yellow-circle {
+            width: 30px;
+            height: 30px;
+            background: #FFD700;
+            border-radius: 50%;
+            top: 12%;
+        }
+
+        .pink-circle {
+            width: 25px;
+            height: 25px;
+            background: #FF7F50;
+            border-radius: 50%;
+            top: 30%;
+        }
+
+        .yellow-triangle {
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-bottom: 30px solid #FFD700;
+            top: 48%;
+            transform: translateX(-50%) rotate(-10deg);
+        }
+
+        .orange-square {
+            width: 28px;
+            height: 28px;
+            background: #FFA07A;
+            top: 66%;
+            transform: translateX(-50%) rotate(10deg);
+        }
+
+        .coral-rectangle {
+            width: 30px;
+            height: 20px;
+            background: #FF7F50;
+            top: 84%;
+            transform: translateX(-50%) rotate(-5deg);
+        }
+
+        /* Main Content */
+        .content {
+            flex: 1;
+            padding: 40px 60px;
+            position: relative;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 40px;
+        }
+
+        .medal-icon {
+            width: 80px;
+            height: 80px;
+        }
+
+        .medal-icon img {
+            width: 100%;
+            height: auto;
+        }
+
+        .logo {
+            height: 40px;
+        }
+
+        /* Certificate Content */
+        .title {
+            color: #1a237e;
+            font-size: 48px;
+            font-weight: 700;
+            margin: 0 0 60px;
+            text-align: left;
+        }
+
+        .presented-text {
+            color: #666666;
+            font-size: 16px;
+            letter-spacing: 1px;
+            margin: 0 0 20px;
+        }
+
+        .recipient-name {
+            color: #FF6B6B;
+            font-size: 36px;
+            font-weight: 600;
+            margin: 0 0 40px;
+        }
+
+        .attendance-text {
+            color: #333333;
+            font-size: 18px;
+            margin: 0 0 40px;
+        }
+
+        .date {
+            font-weight: 600;
+            color: #1a237e;
+        }
+
+        .course-title {
+            margin: 0 0 60px;
+        }
+
+        .course-title-label {
+            color: #1a237e;
+            font-size: 20px;
+            font-weight: 600;
+            display: inline;
+        }
+
+        .course-name {
+            color: #1a237e;
+            font-size: 20px;
+            margin: 0;
+            display: inline;
+        }
+
+        /* Footer */
+        .footer {
+            position: absolute;
+            bottom: 40px;
+            left: 60px;
+        }
+
+        .signature-section {
+            text-align: left;
+        }
+
+        .signature {
+            max-width: 150px;
+            margin-bottom: 8px;
+        }
+
+        .signature-text {
+            color: #666666;
+            font-size: 14px;
+            margin: 0;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+    <div class="certificate-container">
+        <!-- Sidebar with shapes -->
+        <div class="sidebar">
+            <div class="shape yellow-circle"></div>
+            <div class="shape pink-circle"></div>
+            <div class="shape yellow-triangle"></div>
+            <div class="shape orange-square"></div>
+            <div class="shape coral-rectangle"></div>
+        </div>
+
+        <!-- Main content -->
+        <div class="content">
+            <!-- Header -->
+            <div class="header">
+                <div class="medal-icon">
+                    <img src="/medal.png" alt="Flourish Logo" class="logo">
+                </div>
+                <img src="/flourish-logo.jpeg" alt="Flourish Logo" class="logo">
+            </div>
+
+            <!-- Certificate content -->
+            <h1 class="title">Certificate of Participation</h1>
+
+            <p class="presented-text">THIS CERTIFICATE IS PRESENTED TO</p>
+            <h2 class="recipient-name">{{recipientName}}</h2>
+
+            <p class="attendance-text">
+                For attending the Flourish training session on
+                <span class="date">{{sessionDate}}</span>
+            </p>
+
+            <div class="course-title">
+                <span class="course-title-label">Title-</span>
+                <span class="course-name">{{courseName}}</span>
+            </div>
+
+            <!-- Footer with signature -->
+            <div class="footer">
+                <div class="signature-section">
+                    <img src="{{signatureUrl}}" alt="Signature" class="signature">
+                    <p class="signature-text">SIGNATURE</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

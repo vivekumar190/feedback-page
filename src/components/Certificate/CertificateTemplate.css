@@ -1,0 +1,183 @@
+.certificate-container {
+  width: 1000px;
+  height: 600px;
+  margin: 2rem auto;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+}
+
+/* Sidebar Styles */
+.certificate-sidebar {
+  width: 120px;
+  background-color: #1a237e;
+  position: relative;
+  overflow: hidden;
+}
+
+.shape {
+  position: absolute;
+}
+
+.circle-yellow {
+  width: 24px;
+  height: 24px;
+  background: #FFD700;
+  border-radius: 50%;
+  top: 40px;
+  left: 20px;
+}
+
+.circle-coral {
+  width: 20px;
+  height: 20px;
+  background: #FF7F50;
+  border-radius: 50%;
+  top: 80px;
+  left: 30px;
+}
+
+.triangle {
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-bottom: 26px solid #FF6B6B;
+  top: 140px;
+  left: 25px;
+}
+
+.square {
+  width: 20px;
+  height: 20px;
+  background: #FFA07A;
+  transform: rotate(45deg);
+  top: 200px;
+  left: 30px;
+}
+
+.rectangle {
+  width: 24px;
+  height: 16px;
+  background: #FF8C00;
+  top: 260px;
+  left: 25px;
+}
+
+/* Content Styles */
+.certificate-content {
+  flex: 1;
+  padding: 40px 60px;
+  position: relative;
+}
+
+.certificate-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 40px;
+}
+
+.medal-icon {
+  width: 60px;
+  height: 60px;
+}
+
+.flourish-logo {
+  height: 40px;
+  width: auto;
+}
+
+.certificate-title {
+  color: #1a237e;
+  font-size: 48px;
+  font-weight: 700;
+  margin: 0 0 60px;
+  text-align: left;
+}
+
+.certificate-body {
+  text-align: left;
+}
+
+.presented-text {
+  color: #666666;
+  font-size: 16px;
+  margin: 0 0 20px;
+  letter-spacing: 1px;
+}
+
+.recipient-name {
+  color: #FF6B6B;
+  font-size: 36px;
+  font-weight: 600;
+  margin: 0 0 40px;
+}
+
+.participation-text {
+  color: #333333;
+  font-size: 18px;
+  margin: 0 0 40px;
+}
+
+.date {
+  font-weight: 600;
+  color: #1a237e;
+  margin-left: 8px;
+}
+
+.course-title {
+  margin: 0 0 60px;
+}
+
+.course-title h3 {
+  color: #1a237e;
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  display: inline-block;
+}
+
+.course-title p {
+  color: #333333;
+  font-size: 20px;
+  margin: 0;
+  display: inline;
+}
+
+.certificate-footer {
+  position: absolute;
+  bottom: 40px;
+  left: 60px;
+}
+
+.signature-section {
+  text-align: left;
+}
+
+.signature-image {
+  max-width: 150px;
+  margin-bottom: 8px;
+}
+
+.signature-label {
+  color: #666666;
+  font-size: 14px;
+  margin: 0;
+  letter-spacing: 1px;
+}
+
+@media print {
+  .certificate-container {
+    margin: 0;
+    box-shadow: none;
+  }
+  
+  @page {
+    size: landscape;
+    margin: 0;
+  }
+} 
