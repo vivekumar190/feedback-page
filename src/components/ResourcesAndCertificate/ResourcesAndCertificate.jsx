@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import PropTypes from "prop-types";
 import {
@@ -35,6 +35,9 @@ import {
   getUserDetails,
 } from "../../utils/airtable";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import CertificateTemplate from '../Certificate/CertificateTemplate';
 
 const TabPanel = ({ children, value, index, ...other }) => (
   <Box
@@ -572,6 +575,33 @@ const ResourcesAndCertificate = () => {
   const [error, setError] = useState(null);
   const [certificateData, setCertificateData] = useState(null);
   const [userData, setUserData] = useState(null);
+  const [resources, setResources] = useState([]);
+  const certificateRef = useRef(null);
+
+  const downloadCertificate = async () => {
+    if (!certificateRef.current) return;
+    
+    try {
+      const canvas = await html2canvas(certificateRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+      
+      pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+      pdf.save(`${certificateData.name}_certificate.pdf`);
+    } catch (error) {
+      console.error('Error generating certificate:', error);
+      setError('Failed to generate certificate');
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -584,8 +614,15 @@ const ResourcesAndCertificate = () => {
           getUserDetails(studentId),
         ]);
 
-        setCertificateData(sessionData);
+        setCertificateData({
+          name: `${userDetails.fields.student_first_name} ${userDetails.fields.student_last_name}`,
+          date: sessionData.fields.session_start_date,
+          courseName: sessionData.fields.session_topic,
+          signatureImage: sessionData.fields.speaker_signature?.[0]?.url || '',
+        });
+
         setUserData(userDetails);
+        setResources(sessionData.fields.resources || []);
       } catch (err) {
         setError(err.message || "Failed to load data. Please try again later.");
         console.error(err);
@@ -630,10 +667,11 @@ const ResourcesAndCertificate = () => {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box
         sx={{
-          p: { xs: 2, md: 3 },
+          p: { xs: 1, sm: 2, md: 3 },
           borderRadius: 3,
           bgcolor: "background.paper",
           boxShadow: "0 4px 24px rgba(0, 0, 0, 0.08)",
+          overflow: 'hidden',
         }}
       >
         <Tabs
@@ -655,16 +693,70 @@ const ResourcesAndCertificate = () => {
         </Tabs>
 
         <TabPanel value={tabValue} index={0}>
-          <CertificatePreview
-            userData={userData}
-            onDownload={handleCertificateDownload}
-          />
+          <Box sx={{ position: 'relative' }}>
+            {certificateData && (
+              <>
+                <Box 
+                  ref={certificateRef}
+                  sx={{ 
+                    width: '100%',
+                    maxWidth: { xs: '100%', md: '1000px' },
+                    margin: '0 auto',
+                    mb: 3,
+                    overflow: 'auto',
+                    '& > div': {
+                      minWidth: { xs: '100%', sm: '600px' },
+                      transform: { xs: 'scale(0.9)', sm: 'scale(1)' },
+                      transformOrigin: 'top center',
+                    }
+                  }}
+                >
+                  <CertificateTemplate certificateData={certificateData} />
+                </Box>
+                
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  gap: 2,
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  px: 2,
+                }}>
+                  <Button
+                    variant="contained"
+                    onClick={downloadCertificate}
+                    startIcon={<FileDownloadIcon />}
+                    sx={{
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      py: 1.5,
+                      px: 4,
+                      width: { xs: '100%', sm: 'auto' },
+                      fontSize: { xs: '0.875rem', sm: '1rem' },
+                    }}
+                  >
+                    Download Certificate
+                  </Button>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      textAlign: 'center',
+                      color: 'text.secondary',
+                      display: { xs: 'block', sm: 'none' },
+                      mt: 1
+                    }}
+                  >
+                    Scroll horizontally to view full certificate
+                  </Typography>
+                </Box>
+              </>
+            )}
+          </Box>
         </TabPanel>
 
         <TabPanel value={tabValue} index={1}>
           <Box sx={{ px: 2 }}>
             <Grid container spacing={3}>
-              {certificateData?.fields?.resources?.map((resource) => (
+              {resources.map((resource) => (
                 <Grid item xs={12} sm={6} md={4} key={resource.id}>
                   <ResourceCard
                     filename={resource.filename}

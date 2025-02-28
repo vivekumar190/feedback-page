@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import {
   Box,
@@ -44,6 +44,10 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied';
 import { useNavigate } from "react-router-dom";
 import SessionDetailsCard from "../SessionDetailsCard/SessionDetailsCard";
+import { format, isBefore } from 'date-fns';
+import SessionNotStarted from '../SessionNotStarted/SessionNotStarted';
+import { getSessionDetailsAndResources } from "../../utils/airtable";
+import SpeakerCard from "../SessionDetailsCard/SpeakerCard";
 
 const FeatureBox = ({ icon: Icon, title, description }) => (
   <Box
@@ -53,13 +57,14 @@ const FeatureBox = ({ icon: Icon, title, description }) => (
       mb: 2,
       transform: "translateX(0)",
       transition: "all 0.3s ease-in-out",
-      "&:hover": {
-        transform: "translateX(8px)",
-        "& .feature-icon": {
-          backgroundColor: "rgba(255, 255, 255, 0.2)",
-          transform: "scale(1.1)",
-        },
-      },
+      cursor: "default",
+      // "&:hover": {
+      //   transform: "translateX(8px)",
+      //   "& .feature-icon": {
+      //     backgroundColor: "rgba(255, 255, 255, 0.2)",
+      //     transform: "scale(1.1)",
+      //   },
+      // },
     }}
   >
     <Box
@@ -165,18 +170,18 @@ const validationSchema = Yup.object().shape({
     .oneOf([2, 4, 6, 8, 10], 'Please select a valid rating'),
   lowRatingReason: Yup.string()
     .when('rating', {
-      is: (rating) => rating <= 6,
+      is: (rating) => rating && rating <= 6,
       then: () => Yup.string().required('Please select a reason for your rating'),
       otherwise: () => Yup.string(),
     }),
   otherReason: Yup.string()
-    .when('lowRatingReason', {
-      is: 'Other',
+    .when(['lowRatingReason', 'rating'], {
+      is: (lowRatingReason, rating) => rating && rating <= 6 && lowRatingReason === 'Other',
       then: () => Yup.string().required('Please specify your reason'),
       otherwise: () => Yup.string(),
     }),
-  aspects: Yup.array().of(Yup.string()), // Array of strings
-  suggestions: Yup.string(), // Optional
+  aspects: Yup.array().of(Yup.string()),
+  suggestions: Yup.string(),
 });
 
 const aspects = [
@@ -208,17 +213,18 @@ const FeedbackForm = () => {
   const [feedback, setFeedback] = useState("");
   const [lowRatingReason, setLowRatingReason] = useState("");
   const [otherReason, setOtherReason] = useState("");
+  const [sessionStartTime, setSessionStartTime] = useState(null);
+  const [isSessionStarted, setIsSessionStarted] = useState(true);
+  const [sessionImage, setSessionImage] = useState(null);
+  const [sessionDetails, setSessionDetails] = useState({
+    topic: '',
+    date: '',
+    duration: '',
+  });
+  const [emailTimeout, setEmailTimeout] = useState(null);
 
-  const lowRatingOptions = [
-    "Session content was not engaging",
-    "Speaker was not clear or effective",
-    "Technical issues (audio/video problems)",
-    "Session pace was too fast or too slow",
-    "Q&A session was not satisfactory",
-    "Difficulty in understanding the topic",
-    "Too much or too little interaction",
-    "Other"
-  ];
+  // Email validation regex
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
   // Function to fetch user data by student ID
   const fetchUserDataById = async (studentId) => {
@@ -243,50 +249,52 @@ const FeedbackForm = () => {
             ? userData.student_whatsapp_number[0].replace(/"/g, '') 
             : "",
         });
-
+        
         formik.setValues({
           ...formik.values,
-          whatsappNumber: Array.isArray(userData.student_whatsapp_number) 
-            ? userData.student_whatsapp_number[0].replace(/"/g, '') 
-            : "",
           firstName: Array.isArray(userData.student_first_name) ? userData.student_first_name[0].replace(/"/g, '') : "",
           lastName: Array.isArray(userData.student_last_name) ? userData.student_last_name[0].replace(/"/g, '') : "",
           email: Array.isArray(userData.student_email_id) ? userData.student_email_id[0].replace(/"/g, '') : "",
+          whatsappNumber: Array.isArray(userData.student_whatsapp_number) 
+            ? userData.student_whatsapp_number[0].replace(/"/g, '') 
+            : "",
         }, false);
-
+        
         setIsFormEnabled(true);
         setError(false);
       }
     } catch (error) {
-      console.error("Error fetching user data by ID:", error);
+      console.error("Error fetching user data:", error);
+      setError(true);
     }
   };
 
-  // Effect to check for student ID in URL and fetch data
-  useEffect(() => {
-    const studentId = searchParams.get('studentid');
-    if (studentId) {
-      fetchUserDataById(studentId);
-    }
-  }, []);
+  const lowRatingOptions = [
+    "Content not relevant",
+    "Poor presentation",
+    "Technical issues",
+    "Lack of interaction",
+    "Other"
+  ];
 
+  // Define formik
   const formik = useFormik({
     initialValues: {
-      whatsappNumber: formData.student_whatsapp_number || '',
-      firstName: formData.firstName || '',
-      lastName: formData.lastName || '',
-      email: formData.email || '',
-      rating: null,
+      firstName: '',
+      lastName: '',
+      email: '',
+      whatsappNumber: '',
+      rating: '',
       lowRatingReason: '',
       otherReason: '',
       aspects: [],
       suggestions: '',
     },
-    enableReinitialize: true,
     validationSchema,
     onSubmit: async (values) => {
       try {
         setSubmitting(true);
+        const sessionId = searchParams.get("sessionid");
         const response = await fetch(
           "https://api.airtable.com/v0/appiDWCj01hUW5CtW/tblVK77VaisYt94Ne",
           {
@@ -300,68 +308,91 @@ const FeedbackForm = () => {
                 {
                   fields: {
                     student_registration_id: formData.studentreg_id,
+                    // session_id: [sessionId],
                     feedback: values.suggestions,
                     rating: values.rating,
                     low_rating_reason: values.rating <= 6 ? 
                       (values.lowRatingReason === 'Other' ? values.otherReason : values.lowRatingReason) 
                       : null,
                     aspects: values.aspects,
+                    // student_whatsapp_number: values.whatsappNumber,
+                    // student_email_id: values.email,
+                    // student_first_name: values.firstName,
+                    // student_last_name: values.lastName,
                   },
                 },
               ],
             }),
-          },
+          }
         );
 
-        const data = await response.json();
-
         if (!response.ok) {
-          throw new Error(data.error?.message || "Failed to submit feedback");
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || "Failed to submit feedback");
         }
 
         setOpenSuccessDialog(true);
         setTimeout(() => {
-          setOpenSuccessDialog(false);
-          if (searchParams.get('studentid')) {
-            navigate("/certificate-and-resource/?studentid=" + searchParams.get('studentid')+'&'+"sessionid="+searchParams.get('speakerid'));
-          } else {
-            navigate("/thank-you");
-          }
+          navigate("/thank-you");
         }, 2000);
-      } catch (err) {
-        console.error("Submission error:", err);
-        setError(err.message || "An error occurred while submitting feedback");
+      } catch (error) {
+        console.error("Error submitting feedback:", error);
+        setError(error.message || "Failed to submit feedback. Please try again.");
       } finally {
         setSubmitting(false);
       }
     },
   });
 
-  const handleWhatsappChange = (e) => {
-    let number = e.target.value;
-    number = formatWhatsAppNumber(number);
-    
-    formik.setFieldValue('whatsappNumber', number);
-    
-    if (validateWhatsAppNumber(number)) {
-      fetchUserData(number);
-    } else {
-      setIsFormEnabled(false);
-      setFormData(prev => ({ ...prev, student_whatsapp_number: number }));
-    }
-  };
+  // Add useEffect hooks after all function definitions
+  useEffect(() => {
+    const checkSessionTime = async () => {
+      try {
+        const sessionId = searchParams.get("sessionid");
+        if (sessionId) {
+          const sessionDetails = await getSessionDetailsAndResources(sessionId);
+          const sessionDate = new Date(sessionDetails.fields.session_start_date);
+          setSessionStartTime(sessionDate);
+          
+          // Store session image if available
+          if (sessionDetails.fields.session_details_image) {
+            setSessionImage(sessionDetails.fields.session_details_image[0].url);
+          }
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    formik.setValues({
-      ...formik.values,
-      rating: rating,
-      lowRatingReason: rating <= 6 ? lowRatingReason : '',
-      otherReason: lowRatingReason === 'Other' ? otherReason : '',
-    }, true);
-    
-    formik.handleSubmit();
-  };
+          // Store session details
+          setSessionDetails({
+            topic: sessionDetails.fields.topic_name || '',
+            date: sessionDetails.fields.session_start_date || '',
+            duration: sessionDetails.fields.duration_minute || '',
+          });
+
+          // Check if feedback is disabled for this session
+          if (sessionDetails.fields.show_feedback === "no") {
+            navigate("/not-started", { 
+              state: { 
+                sessionStartTime: sessionDetails.fields.session_start_date 
+              } 
+            });
+            return;
+          }
+          
+          // Check if current time is before session start time
+          const now = new Date();
+          setIsSessionStarted(!isBefore(now, sessionDate));
+        }
+      } catch (error) {
+        console.error("Error checking session time:", error);
+      }
+    };
+    checkSessionTime();
+  }, []);
+
+  useEffect(() => {
+    const studentId = searchParams.get("studentid");
+    if (studentId) {
+      fetchUserDataById(studentId);
+    }
+  }, []);
 
   useEffect(() => {
     if (rating) {
@@ -380,6 +411,107 @@ const FeedbackForm = () => {
       formik.setFieldValue('otherReason', otherReason);
     }
   }, [otherReason]);
+
+  // Early return if session hasn't started
+  if (!isSessionStarted && sessionStartTime) {
+    return <SessionNotStarted sessionStartTime={sessionStartTime} />;
+  }
+
+  // Function to fetch user data by Email
+  const fetchUserDataByEmail = useCallback(async (email) => {
+    if (!emailRegex.test(email)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.airtable.com/v0/appiDWCj01hUW5CtW/tblxRTVl1GCaKjuLU?filterByFormula=AND(student_email_id%3D%22${email}%22)`,
+        {
+          headers: {
+            Authorization: `Bearer ${import.meta.env.VITE_AIRTABLE_API_KEY}`,
+          },
+        }
+      );
+      const data = await response.json();
+      if (data.records && data.records.length > 0) {
+        const userData = data.records[0];
+        // Clean and format the data
+        const cleanData = {
+          firstName: Array.isArray(userData.fields.student_first_name) 
+            ? userData.fields.student_first_name[0].replace(/"/g, '') 
+            : userData.fields.student_first_name || "",
+          lastName: Array.isArray(userData.fields.student_last_name) 
+            ? userData.fields.student_last_name[0].replace(/"/g, '') 
+            : userData.fields.student_last_name || "",
+          email: Array.isArray(userData.fields.student_email_id) 
+            ? userData.fields.student_email_id[0].replace(/"/g, '') 
+            : userData.fields.student_email_id || "",
+          whatsappNumber: Array.isArray(userData.fields.student_whatsapp_number) 
+            ? userData.fields.student_whatsapp_number[0].replace(/"/g, '') 
+            : userData.fields.student_whatsapp_number || "",
+        };
+
+        setFormData({
+          firstName: cleanData.firstName,
+          lastName: cleanData.lastName,
+          email: cleanData.email,
+          studentreg_id: [userData.id] || "",
+          student_whatsapp_number: cleanData.whatsappNumber,
+        });
+        
+        // Update formik values
+        formik.setValues({
+          ...formik.values,
+          firstName: cleanData.firstName,
+          lastName: cleanData.lastName,
+          email: cleanData.email,
+          whatsappNumber: cleanData.whatsappNumber,
+        }, false);
+        
+        setIsFormEnabled(true);
+        setError(false);
+      } else {
+        setError(true);
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+      setError(true);
+    }
+  }, [formik]);
+
+  // Handle email input change
+  const handleEmailChange = (e) => {
+    const email = e.target.value;
+    formik.handleChange(e); // Use formik's handleChange instead
+    
+    // Clear any existing timeout
+    if (emailTimeout) {
+      clearTimeout(emailTimeout);
+    }
+    
+    // Set a new timeout to fetch data after user stops typing
+    const newTimeout = setTimeout(() => {
+      if (emailRegex.test(email)) {
+        fetchUserDataByEmail(email);
+      }
+    }, 1000); // Wait 1 second after user stops typing
+
+    setEmailTimeout(newTimeout);
+  };
+
+  const handleWhatsappChange = (e) => {
+    let number = e.target.value;
+    number = formatWhatsAppNumber(number);
+    
+    formik.setFieldValue('whatsappNumber', number);
+    
+    if (validateWhatsAppNumber(number)) {
+      fetchUserData(number);
+    } else {
+      setIsFormEnabled(false);
+      setFormData(prev => ({ ...prev, student_whatsapp_number: number }));
+    }
+  };
 
   // Existing fetchUserData function remains unchanged
   const fetchUserData = async (number) => {
@@ -435,7 +567,7 @@ const FeedbackForm = () => {
       sx={{ 
         py: { xs: 2, md: 4 },
         px: { xs: 2, md: 3 },
-        minHeight: '100vh',
+        // minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -470,48 +602,41 @@ const FeedbackForm = () => {
             sx={{
               borderRadius: 3,
               p: 3,
-              color: "white",
+              // color: "white",
+              color: sessionImage ? 'black' : 'white',
               cursor: "pointer",
               transition: "transform 0.2s",
-              "&:hover": {
-                transform: "scale(1.02)",
-              },
+              // "&:hover": {
+              //   transform: "scale(1.02)",
+              // },
               height: "100%",
               position: "relative",
               overflow: "hidden",
               boxShadow: "0 10px 40px -10px rgba(99, 102, 241, 0.4)",
-              background: `linear-gradient(135deg, 
+              backgroundImage: sessionImage ? 
+                `url(${sessionImage})` : 
+                `linear-gradient(135deg, 
                 #6366F1 0%,
-                #8B5CF6 50%,
+                #8B5CF6 70%,
                 #D946EF 100%
               )`,
-              "&::before": {
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+             
+              '&::before': sessionImage ? {
                 content: '""',
-                position: "absolute",
+                position: 'absolute',
                 top: 0,
                 left: 0,
                 right: 0,
                 bottom: 0,
-                background: `radial-gradient(circle at top right,
-                  rgba(255,255,255,0.2) 0%,
-                  rgba(255,255,255,0.1) 10%,
-                  transparent 50%
-                )`,
-                pointerEvents: "none",
-              },
-              "&::after": {
-                content: '""',
-                position: "absolute",
-                top: "-50%",
-                left: "-50%",
-                right: "-50%",
-                bottom: "-50%",
-                background:
-                  "radial-gradient(ellipse at center, rgba(255,255,255,0.15) 0%, transparent 70%)",
-                transform: "rotate(45deg)",
-                pointerEvents: "none",
-                animation: "gradient-rotate 15s linear infinite",
-                filter: "blur(20px)",
+                backdropFilter: 'blur(2px)',
+                // background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.9) 0%, rgba(139, 92, 246, 0.9) 20%)',
+                zIndex: 1,
+              } : {},
+              '& > *': {
+                position: 'relative',
+                zIndex: 2,
               },
               "@keyframes gradient-rotate": {
                 "0%": {
@@ -524,28 +649,9 @@ const FeedbackForm = () => {
             }}
           >
             {/* Mobile View */}
-            <Box sx={{ display: { xs: "block", md: "none" } }}>
-              {/* Header Section */}
-              <Box sx={{ mb: 1, }}>
-                {/* Flourish Logo */}
-                {/* <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "center",
-                    mb: 2,
-                  }}
-                >
-                  <img
-                    src="/flourish-logo.jpeg"
-                    alt="Flourish Logo"
-                    style={{
-                      height: 50,
-                      borderRadius: 5,
-                    }}
-                  />
-                </Box> */}
+            {/* <Box sx={{ display: { xs: "block", md: "none" } }}>
 
-                {/* Feedback Matters Text */}
+              <Box sx={{ mb: 1, }}>
                 <Typography
                   variant="h5"
                   gutterBottom
@@ -560,39 +666,81 @@ const FeedbackForm = () => {
                 >
                   Your Feedback Matters!
                 </Typography>
-
-                {/* Session Details */}
                 <Box sx={{ mb: .5 ,p:2,mt:4}}>
                 <SessionDetailsCard />
                 </Box>
               </Box>
-            </Box>
+            </Box> */}
 
             {/* Desktop View - Full Content */}
-            <Box sx={{ display: { xs: "none", md: "block" } }}>
-              <Box sx={{ position: "relative" }}>
+            <Box >
+              <Box sx={{ position: "relative" ,cursor: "default",}}>
                 <Typography
-                  variant="h5"
-                  gutterBottom
-                  fontWeight={600}
+                  variant="h4"
                   sx={{
-                    mb: 3,
-                    background:
-                      "linear-gradient(to right, #fff, rgba(255,255,255,0.8))",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
+                    fontWeight: 700,
+                    mb: 2,
+                    fontSize: { xs: "1.5rem", md: "1.8rem" },
                   }}
                 >
-                  Your Feedback Matters!
+                  Your Feedback Matters !
                 </Typography>
 
-                {/* Session Details for Desktop */}
-                <Box sx={{ mb: 4 ,p:2}}>
-                  <SessionDetailsCard />
+                {/* Session Details */}
+                <Box 
+                  sx={{ 
+                    mt: 3, 
+                    mb: 4,
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    borderRadius: 2,
+                    p: 2,
+                    backdropFilter: 'blur(4px)',
+                  }}
+                >
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      mb: 1,
+                      fontWeight: 500,
+                    }}
+                  >
+                    <MenuBookIcon sx={{ fontSize: 20 }} />
+                    {sessionDetails.topic}
+                  </Typography>
+                  <SpeakerCard />
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      mb: 1,
+                      fontWeight: 500,
+                    }}
+                  >
+                    <AccessTimeIcon sx={{ fontSize: 18 }} />
+                    {sessionDetails.date ? format(new Date(sessionDetails.date), "MMMM d, yyyy 'at' h:mm a") : ''}
+                  </Typography>
+                  
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      fontWeight: 500,
+                    }}
+                  >
+                    <AccessTimeIcon sx={{ fontSize: 18 }} />
+                    Duration: {sessionDetails.duration}
+                  </Typography>
                 </Box>
 
                 {/* Features Section */}
-                <Box sx={{ mb: 2 }}>
+                <Box sx={{ mb: 2, display: { xs: "none", md: "block" } }}>
                   <FeatureBox
                     icon={ChatBubbleOutlineIcon}
                     title="Share Your Thoughts"
@@ -606,7 +754,7 @@ const FeedbackForm = () => {
                   <FeatureBox
                     icon={EmojiEventsIcon}
                     title="Get Certificate"
-                    description="Receive your participation certificate instantly"
+                    description="Receive your participation certificate."
                   />
                 </Box>
 
@@ -631,7 +779,11 @@ const FeedbackForm = () => {
         {/* Right Panel - Enhanced styling */}
         <Grid item xs={12} md={7} sx={{ display: 'flex' }}>
           <Paper
-            id="feedback-form"
+            component="form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              formik.handleSubmit();
+            }}
             sx={{
               borderRadius: { xs: 2.5, md: 3 },
               p: { xs: 2.5, md: 3 },
@@ -690,6 +842,73 @@ const FeedbackForm = () => {
                 </Typography>
 
             <Grid container spacing={2.5}>
+              {/* Email Field - Moved to top */}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="email"
+                  label="Email"
+                  required
+                  value={formik.values.email}
+                  onChange={handleEmailChange}
+                  onBlur={formik.handleBlur}
+                  name="email"
+                  error={formik.touched.email && Boolean(formik.errors.email)}
+                  helperText={formik.touched.email && formik.errors.email}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      backgroundColor: 'background.paper',
+                    }
+                  }}
+                />
+              </Grid>
+
+
+              {/* First Name Field */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="First Name"
+                  required
+                  disabled={!isFormEnabled}
+                  value={formik.values.firstName}
+                  onChange={formik.handleChange}
+                  name="firstName"
+                  error={formik.touched.firstName && Boolean(formik.errors.firstName)}
+                  helperText={formik.touched.firstName && formik.errors.firstName}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      backgroundColor: isFormEnabled ? 'background.paper' : 'action.disabledBackground',
+                    }
+                  }}
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Last Name"
+                  required
+                  disabled={!isFormEnabled}
+                  value={formik.values.lastName}
+                  onChange={formik.handleChange}
+                  name="lastName"
+                  error={formik.touched.lastName && Boolean(formik.errors.lastName)}
+                  helperText={formik.touched.lastName && formik.errors.lastName}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      backgroundColor: isFormEnabled ? 'background.paper' : 'action.disabledBackground',
+                    }
+                  }}
+                />
+              </Grid>
+
               {/* WhatsApp Field */}
               <Grid item xs={12}>
                 <Box sx={{ position: 'relative' }}>
@@ -801,77 +1020,7 @@ const FeedbackForm = () => {
                   )}
                 </Box>
               </Grid>
-
-              {/* Name Fields */}
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="First Name"
-                  required
-                  disabled={!isFormEnabled}
-                  value={formik.values.firstName}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  name="firstName"
-                  error={formik.touched.firstName && Boolean(formik.errors.firstName)}
-                  helperText={formik.touched.firstName && formik.errors.firstName}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                      backgroundColor: isFormEnabled ? 'background.paper' : 'action.disabledBackground',
-                    }
-                  }}
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Last Name"
-                  required
-                  disabled={!isFormEnabled}
-                  value={formik.values.lastName}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  name="lastName"
-                  error={formik.touched.lastName && Boolean(formik.errors.lastName)}
-                  helperText={formik.touched.lastName && formik.errors.lastName}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                      backgroundColor: isFormEnabled ? 'background.paper' : 'action.disabledBackground',
-                    }
-                  }}
-                />
-              </Grid>
-
-              {/* Email Field */}
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="email"
-                  label="Email"
-                  required
-                  disabled={!isFormEnabled}
-                  value={formik.values.email}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  name="email"
-                  error={formik.touched.email && Boolean(formik.errors.email)}
-                  helperText={formik.touched.email && formik.errors.email}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                      backgroundColor: isFormEnabled ? 'background.paper' : 'action.disabledBackground',
-                    }
-                  }}
-                />
-              </Grid>
-
-              {/* Rating Field - Mandatory */}
+              {/* Rating Field */}
               <Grid item xs={12}>
                 <Typography 
                   variant="subtitle2" 
@@ -896,8 +1045,26 @@ const FeedbackForm = () => {
                   </Box>
                 </Typography>
                 <EmojiRating
-                  value={rating}
-                  onChange={(newValue) => setRating(newValue)}
+                  value={formik.values.rating}
+                  onChange={(newValue) => {
+                    formik.setFieldValue('rating', newValue);
+                    formik.setFieldTouched('rating', true, false);
+                    // Clear low rating fields if rating becomes high
+                    if (newValue > 6) {
+                      formik.setFieldValue('lowRatingReason', '');
+                      formik.setFieldValue('otherReason', '');
+                      // Also clear touched state for these fields
+                      formik.setFieldTouched('lowRatingReason', false);
+                      formik.setFieldTouched('otherReason', false);
+                    }
+                    // Validate form after rating change
+                    formik.validateForm().then(() => {
+                      formik.setTouched({
+                        ...formik.touched,
+                        rating: true
+                      });
+                    });
+                  }}
                   error={false}
                   sx={{
                     '& .MuiRating-root': {
@@ -908,25 +1075,23 @@ const FeedbackForm = () => {
               </Grid>
 
               {/* Low Rating Reason Dropdown */}
-              {rating && rating <= 6 && (
+              {formik.values.rating && formik.values.rating <= 6 && (
                 <Grid item xs={12}>
                   <Typography 
                     variant="body2" 
-                    // color="text.secondary" 
-                    sx={{ mb: 1 ,  color: 'primary.main',}}
+                    sx={{ mb: 1, color: 'primary.main' }}
                   >
-                  Could you please share why? <Box 
-                    component="span" 
-                    sx={{ 
-                      color: 'error.main',
-                      fontSize: '1rem',
-                      lineHeight: 1
-                    }}
-                  >
-                    *
-                  </Box>
+                    Could you please share why? <Box 
+                      component="span" 
+                      sx={{ 
+                        color: 'error.main',
+                        fontSize: '1rem',
+                        lineHeight: 1
+                      }}
+                    >
+                      *
+                    </Box>
                   </Typography>
-                  
                   
                   <FormControl 
                     fullWidth 
@@ -940,11 +1105,24 @@ const FeedbackForm = () => {
                     <Select
                       labelId="low-rating-reason-label"
                       id="low-rating-reason"
-                      value={lowRatingReason}
+                      name="lowRatingReason"
+                      onBlur={formik.handleBlur}
+                      value={formik.values.lowRatingReason}
                       label="Select Reason"
                       onChange={(e) => {
-                        setLowRatingReason(e.target.value);
                         formik.setFieldValue('lowRatingReason', e.target.value);
+                        formik.setFieldTouched('lowRatingReason', true, false);
+                        if (e.target.value !== 'Other') {
+                          formik.setFieldValue('otherReason', '');
+                          formik.setFieldTouched('otherReason', false);
+                        }
+                        // Validate form immediately after changing reason
+                        formik.validateForm().then(() => {
+                          formik.setTouched({
+                            ...formik.touched,
+                            lowRatingReason: true
+                          });
+                        });
                       }}
                       sx={{ mb: { xs: .5, sm: 1 } }}
                     >
@@ -966,17 +1144,19 @@ const FeedbackForm = () => {
                   </FormControl>
 
                   {/* Other Reason TextField */}
-                  {lowRatingReason === "Other" && (
+                  {formik.values.lowRatingReason === "Other" && (
                     <TextField
                       fullWidth
                       size="small"
                       multiline
                       rows={2}
+                      name="otherReason"
+                      onBlur={formik.handleBlur}
                       label="Please specify the reason"
-                      value={otherReason}
+                      value={formik.values.otherReason}
                       onChange={(e) => {
-                        setOtherReason(e.target.value);
                         formik.setFieldValue('otherReason', e.target.value);
+                        formik.setFieldTouched('otherReason', true, false);
                       }}
                       error={formik.touched.otherReason && Boolean(formik.errors.otherReason)}
                       helperText={formik.touched.otherReason && formik.errors.otherReason}
@@ -1083,20 +1263,14 @@ const FeedbackForm = () => {
               {/* Submit Button */}
               <Grid item xs={12}>
                 <Button
+                  type="submit"
                   variant="contained"
                   fullWidth
-                  disabled={!isFormEnabled || submitting || !rating}
-                  onClick={handleSubmit}
+                  disabled={!isFormEnabled || submitting || !formik.isValid || formik.isSubmitting}
                   sx={{
                     py: 1.5,
                     borderRadius: 2,
                     textTransform: 'none',
-                    fontSize: '0.9rem',
-                    fontWeight: 500,
-                    boxShadow: 'none',
-                    '&:hover': {
-                      boxShadow: 'none',
-                    }
                   }}
                 >
                   {submitting ? 'Submitting...' : 'Submit Feedback'}

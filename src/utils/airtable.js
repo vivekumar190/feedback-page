@@ -3,7 +3,7 @@ import axios from 'axios';
 const AIRTABLE_API_KEY = import.meta.env.VITE_AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = import.meta.env.VITE_AIRTABLE_BASE_ID;
 const SESSION_TABLE_ID = 'tblgUfc6jVKd57W7T';
-const STUDENT_TABLE_ID = 'tbla16kSdqRkZLUO1';
+const STUDENT_TABLE_ID = 'tblxRTVl1GCaKjuLU';
 
 const airtableApi = axios.create({
   baseURL: `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}`,

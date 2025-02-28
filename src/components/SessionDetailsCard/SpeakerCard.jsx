@@ -40,7 +40,7 @@ const formatDate = (dateString) => {
   return { formattedDate, formattedTime };
 };
 
-const SessionDetailsCard = () => {
+const SpeakerCard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sessionData, setSessionData] = useState(null);
@@ -83,51 +83,9 @@ const SessionDetailsCard = () => {
   const { formattedDate, formattedTime } = formatDate(sessionData.fields.session_start_date);
 
   return (
-    <Box sx={{ position: 'relative' }}>
-      {/* Background Gradient Overlay */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: -24,
-          left: -24,
-          right: -24,
-          bottom: -24,
-          background: '#fff',
-          zIndex: 0,
-          backdropFilter: 'blur(20px)',
-          borderRadius: 3,
-          boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-        }}
-      />
+ 
 
-      {/* Session Title */}
-      <Typography
-        variant="h6"
-        sx={{
-          position: 'relative',
-          zIndex: 1,
-          fontWeight: 600,
-          color: 'text.primary',
-          mb: 3,
-          fontSize: { xs: '1.1rem', sm: '1.25rem' },
-          lineHeight: 1.3,
-          '&::after': {
-            content: '""',
-            position: 'absolute',
-            bottom: -8,
-            left: 0,
-            width: 40,
-            height: 3,
-            borderRadius: 1,
-            background: 'linear-gradient(90deg, rgba(99, 102, 241, 0.8), rgba(217, 70, 239, 0.8))',
-          },
-        }}
-      >
-        {sessionData.fields.topic_name}
-      </Typography>
 
-      {/* Speaker Info */}
       <Box 
         sx={{ 
           position: 'relative',
@@ -138,15 +96,15 @@ const SessionDetailsCard = () => {
           mb: 2.5,
           p: 1.5,
           borderRadius: 2,
-          bgcolor: 'rgba(255, 255, 255, 0.8)',
+        //   bgcolor: 'rgba(255, 255, 255, 0.8)',
           backdropFilter: 'blur(12px)',
           boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
           transition: 'all 0.3s ease',
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
-            bgcolor: 'rgba(255, 255, 255, 0.9)',
-          },
+        //   '&:hover': {
+        //     transform: 'translateY(-2px)',
+        //     boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+        //     bgcolor: 'rgba(255, 255, 255, 0.9)',
+        //   },
         }}
       >
         <Box
@@ -231,65 +189,7 @@ const SessionDetailsCard = () => {
         </Box>
       </Box>
 
-      {/* Date and Time */}
-      <Box 
-        sx={{ 
-          position: 'relative',
-          zIndex: 1,
-          display: 'flex', 
-          flexWrap: 'wrap',
-          gap: 1,
-          '& .MuiChip-root': {
-            transition: 'all 0.3s ease',
-            backdropFilter: 'blur(8px)',
-            '&:hover': {
-              transform: 'translateY(-2px)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-            },
-          },
-        }}
-      >
-        <Chip
-          icon={<EventIcon />}
-          label={formattedDate}
-          size="small"
-          sx={{
-            bgcolor: 'rgba(99, 102, 241, 0.15)',
-            color: 'primary.main',
-            borderRadius: 2,
-            height: 32,
-            '& .MuiChip-label': {
-              px: 1.5,
-              fontWeight: 500,
-            },
-            '& .MuiChip-icon': {
-              color: 'primary.main',
-              fontSize: 18,
-            },
-          }}
-        />
-        <Chip
-          icon={<AccessTimeIcon />}
-          label={formattedTime}
-          size="small"
-          sx={{
-            bgcolor: 'rgba(217, 70, 239, 0.15)',
-            color: 'secondary.main',
-            borderRadius: 2,
-            height: 32,
-            '& .MuiChip-label': {
-              px: 1.5,
-              fontWeight: 500,
-            },
-            '& .MuiChip-icon': {
-              color: 'secondary.main',
-              fontSize: 18,
-            },
-          }}
-        />
-      </Box>
-    </Box>
   );
 };
 
-export default SessionDetailsCard; 
+export default SpeakerCard; 

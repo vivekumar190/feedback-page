@@ -9,12 +9,12 @@ const Footer = () => {
   const socialLinks = [
     { 
       icon: LinkedInIcon, 
-      url: 'https://www.linkedin.com/company/eblity/',
+      url: 'https://www.linkedin.com/company/flourishly/',
       color: '#0A66C2'
     },
     { 
       icon: YouTubeIcon, 
-      url: 'https://www.youtube.com/channel/UC8ZwV6ONph-127-QDG4Ag5g',
+      url: 'https://www.youtube.com/@flourishly',
       color: '#FF0000'
     },
     { 
@@ -125,7 +125,7 @@ const Footer = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 sx={{
-                  color: 'text.secondary',
+                  color: social.color,
                   '&:hover': {
                     color: social.color,
                     bgcolor: `${social.color}15`

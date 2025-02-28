@@ -7,6 +7,7 @@ import Footer from './components/Footer/Footer';
 import Header from './components/Header/Header';
 import ThankYou from './components/ThankYou/ThankYou';
 import BackgroundShapes from './components/BackgroundElements/BackgroundShapes';
+import SessionNotStarted from './components/SessionNotStarted/SessionNotStarted';
 
 const theme = createTheme({
   palette: {
@@ -84,12 +85,13 @@ function App() {
           zIndex: 1,
         }}>
           <Header />
-          <Box sx={{ flex: 1, py: 2 }}>
+          <Box sx={{ flex: 1, py: 1 }}>
             <Routes>
               <Route path="/" element={<Menu />} />
               <Route path="/feedback" element={<FeedbackForm />} />
               <Route path="/certificate-and-resource" element={<ResourcesAndCertificate />} />
               <Route path="/thank-you" element={<ThankYou />} />
+              <Route path="/not-started" element={<SessionNotStarted />} />
             </Routes>
           </Box>
           <Footer />
