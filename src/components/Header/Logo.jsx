@@ -4,10 +4,10 @@ const Logo = () => {
   return (
     <Box
       component="img"
-      src="/eblitylogo.png"
-      alt="Eblity"
+      src="/flourish-logo.jpeg"
+      alt="Flourish"
       sx={{ 
-        height: 32,
+        height: 50,
         width: 'auto'
       }}
     />

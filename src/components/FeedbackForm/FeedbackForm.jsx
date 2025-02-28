@@ -42,6 +42,8 @@ import ExtensionIcon from '@mui/icons-material/Extension';
 import SessionDetails from '../SessionDetails/SessionDetails';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied';
+import { useNavigate } from "react-router-dom";
+import SessionDetailsCard from "../SessionDetailsCard/SessionDetailsCard";
 
 const FeatureBox = ({ icon: Icon, title, description }) => (
   <Box
@@ -128,16 +130,19 @@ SocialButton.propTypes = {
   icon: PropTypes.elementType.isRequired,
 };
 
-import { useNavigate } from "react-router-dom";
-
 const formatWhatsAppNumber = (number) => {
+  // Convert number to string if it's a number type
+  const numStr = number?.toString() || '';
   // Remove all non-digit characters
-  const digits = number.replace(/\D/g, '');
+  const digits = numStr.replace(/\D/g, '');
   return digits;
 };
 
 const validateWhatsAppNumber = (number) => {
-  const digits = number.replace(/\D/g, '');
+  // Convert number to string if it's a number type
+  const numStr = number?.toString() || '';
+  // Remove all non-digit characters
+  const digits = numStr.replace(/\D/g, '');
   return digits.length === 10;
 };
 
@@ -187,6 +192,7 @@ const aspects = [
 
 const FeedbackForm = () => {
   const navigate = useNavigate();
+  const searchParams = new URLSearchParams(window.location.search);
   const [isFormEnabled, setIsFormEnabled] = useState(false);
   const [openSuccessDialog, setOpenSuccessDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -214,48 +220,55 @@ const FeedbackForm = () => {
     "Other"
   ];
 
-  const fetchUserData = async (number) => {
+  // Function to fetch user data by student ID
+  const fetchUserDataById = async (studentId) => {
     try {
       const response = await fetch(
-        `https://api.airtable.com/v0/appiDWCj01hUW5CtW/tbla16kSdqRkZLUO1/?filterByFormula=student_whatsapp_number=${number}`,
+        `https://api.airtable.com/v0/appiDWCj01hUW5CtW/tblxRTVl1GCaKjuLU/${studentId}`,
         {
           headers: {
             Authorization: `Bearer ${import.meta.env.VITE_AIRTABLE_API_KEY}`,
           },
-        },
+        }
       );
       const data = await response.json();
-      if (data.records && data.records?.length > 0) {
-        const userData = data.records[0].fields;
-        
+      if (data) {
+        const userData = data.fields;
         setFormData({
-          firstName: userData.student_first_name || "",
-          lastName: userData.student_last_name || "",
-          email: userData.student_email_id || "",
-          studentreg_id: userData.student_registration || "",
-          student_whatsapp_number: number,
+          firstName: Array.isArray(userData.student_first_name) ? userData.student_first_name[0].replace(/"/g, '') : "",
+          lastName: Array.isArray(userData.student_last_name) ? userData.student_last_name[0].replace(/"/g, '') : "",
+          email: Array.isArray(userData.student_email_id) ? userData.student_email_id[0].replace(/"/g, '') : "",
+          studentreg_id: [userData.record_id] || "",
+          student_whatsapp_number: Array.isArray(userData.student_whatsapp_number) 
+            ? userData.student_whatsapp_number[0].replace(/"/g, '') 
+            : "",
         });
 
         formik.setValues({
           ...formik.values,
-          whatsappNumber: number,
-          firstName: userData.student_first_name || "",
-          lastName: userData.student_last_name || "",
-          email: userData.student_email_id || "",
+          whatsappNumber: Array.isArray(userData.student_whatsapp_number) 
+            ? userData.student_whatsapp_number[0].replace(/"/g, '') 
+            : "",
+          firstName: Array.isArray(userData.student_first_name) ? userData.student_first_name[0].replace(/"/g, '') : "",
+          lastName: Array.isArray(userData.student_last_name) ? userData.student_last_name[0].replace(/"/g, '') : "",
+          email: Array.isArray(userData.student_email_id) ? userData.student_email_id[0].replace(/"/g, '') : "",
         }, false);
 
         setIsFormEnabled(true);
         setError(false);
-      } else {
-        setError(true);
-        setIsFormEnabled(false);
-        formik.setFieldValue('whatsappNumber', number);
       }
     } catch (error) {
-      console.error("Error fetching user data:", error);
-      formik.setFieldValue('whatsappNumber', number);
+      console.error("Error fetching user data by ID:", error);
     }
   };
+
+  // Effect to check for student ID in URL and fetch data
+  useEffect(() => {
+    const studentId = searchParams.get('studentid');
+    if (studentId) {
+      fetchUserDataById(studentId);
+    }
+  }, []);
 
   const formik = useFormik({
     initialValues: {
@@ -309,7 +322,11 @@ const FeedbackForm = () => {
         setOpenSuccessDialog(true);
         setTimeout(() => {
           setOpenSuccessDialog(false);
-          navigate("/thank-you");
+          if (searchParams.get('studentid')) {
+            navigate("/certificate-and-resource/?studentid=" + searchParams.get('studentid')+'&'+"sessionid="+searchParams.get('speakerid'));
+          } else {
+            navigate("/thank-you");
+          }
         }, 2000);
       } catch (err) {
         console.error("Submission error:", err);
@@ -363,6 +380,54 @@ const FeedbackForm = () => {
       formik.setFieldValue('otherReason', otherReason);
     }
   }, [otherReason]);
+
+  // Existing fetchUserData function remains unchanged
+  const fetchUserData = async (number) => {
+    try {
+      const response = await fetch(
+        `https://api.airtable.com/v0/appiDWCj01hUW5CtW/tblxRTVl1GCaKjuLU/?filterByFormula=student_whatsapp_number=${number}`,
+        {
+          headers: {
+            Authorization: `Bearer ${import.meta.env.VITE_AIRTABLE_API_KEY}`,
+          },
+        },
+      );
+      const data = await response.json();
+      if (data.records && data.records?.length > 0) {
+        const userData = data.records[0].fields;
+        
+        setFormData({
+          firstName: Array.isArray(userData.student_first_name) ? userData.student_first_name[0].replace(/"/g, '') : "",
+          lastName: Array.isArray(userData.student_last_name) ? userData.student_last_name[0].replace(/"/g, '') : "",
+          email: Array.isArray(userData.student_email_id) ? userData.student_email_id[0].replace(/"/g, '') : "",
+          studentreg_id: [userData.record_id] || "",
+          student_whatsapp_number: Array.isArray(userData.student_whatsapp_number) 
+            ? userData.student_whatsapp_number[0].replace(/"/g, '') 
+            : number.toString(),
+        });
+
+        formik.setValues({
+          ...formik.values,
+          whatsappNumber: Array.isArray(userData.student_whatsapp_number) 
+            ? userData.student_whatsapp_number[0].replace(/"/g, '') 
+            : number.toString(),
+          firstName: Array.isArray(userData.student_first_name) ? userData.student_first_name[0].replace(/"/g, '') : "",
+          lastName: Array.isArray(userData.student_last_name) ? userData.student_last_name[0].replace(/"/g, '') : "",
+          email: Array.isArray(userData.student_email_id) ? userData.student_email_id[0].replace(/"/g, '') : "",
+        }, false);
+
+        setIsFormEnabled(true);
+        setError(false);
+      } else {
+        setError(true);
+        setIsFormEnabled(false);
+        formik.setFieldValue('whatsappNumber', number);
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+      formik.setFieldValue('whatsappNumber', number);
+    }
+  };
 
   return (
     <Container 
@@ -461,9 +526,9 @@ const FeedbackForm = () => {
             {/* Mobile View */}
             <Box sx={{ display: { xs: "block", md: "none" } }}>
               {/* Header Section */}
-              <Box sx={{ mb: 1, textAlign: "center" }}>
+              <Box sx={{ mb: 1, }}>
                 {/* Flourish Logo */}
-                <Box
+                {/* <Box
                   sx={{
                     display: "flex",
                     justifyContent: "center",
@@ -478,7 +543,7 @@ const FeedbackForm = () => {
                       borderRadius: 5,
                     }}
                   />
-                </Box>
+                </Box> */}
 
                 {/* Feedback Matters Text */}
                 <Typography
@@ -497,7 +562,9 @@ const FeedbackForm = () => {
                 </Typography>
 
                 {/* Session Details */}
-                <SessionDetails />
+                <Box sx={{ mb: .5 ,p:2,mt:4}}>
+                <SessionDetailsCard />
+                </Box>
               </Box>
             </Box>
 
@@ -520,8 +587,8 @@ const FeedbackForm = () => {
                 </Typography>
 
                 {/* Session Details for Desktop */}
-                <Box sx={{ mb: 4 }}>
-                  <SessionDetails />
+                <Box sx={{ mb: 4 ,p:2}}>
+                  <SessionDetailsCard />
                 </Box>
 
                 {/* Features Section */}
@@ -598,17 +665,29 @@ const FeedbackForm = () => {
             }}
           >
             <Typography 
-              variant="h6" 
+              variant="h7" 
               gutterBottom 
               sx={{ 
-                mb: 3,
+                mb: 1,
                 color: 'primary.main',
                 fontWeight: 600,
-                fontSize: { xs: '1.125rem', sm: '1.25rem' }
+                fontSize: { xs: '1.125rem', sm: '1.4rem' }
               }}
             >
               Share Your Experience
             </Typography>
+            <Typography
+                  variant="caption"
+                  fontWeight={500}
+                  sx={{
+                    display: 'block',
+                    mt: 0,
+                    mb: 3,
+                    color: 'text.secondary'
+                  }}
+                >
+                  Fill the form to get your certificate and resources
+                </Typography>
 
             <Grid container spacing={2.5}>
               {/* WhatsApp Field */}
@@ -833,18 +912,28 @@ const FeedbackForm = () => {
                 <Grid item xs={12}>
                   <Typography 
                     variant="body2" 
-                    color="text.secondary" 
-                    sx={{ mb: 1 }}
+                    // color="text.secondary" 
+                    sx={{ mb: 1 ,  color: 'primary.main',}}
                   >
-                  Could you please share why?
+                  Could you please share why? <Box 
+                    component="span" 
+                    sx={{ 
+                      color: 'error.main',
+                      fontSize: '1rem',
+                      lineHeight: 1
+                    }}
+                  >
+                    *
+                  </Box>
                   </Typography>
+                  
                   
                   <FormControl 
                     fullWidth 
                     size="small"
                     error={formik.touched.lowRatingReason && Boolean(formik.errors.lowRatingReason)}
                     sx={{ 
-                      mt: { xs: 0.5, sm: 1 }
+                      mt: { xs: 1, sm: 2 }
                     }}
                   >
                     <InputLabel id="low-rating-reason-label">Select Reason</InputLabel>
@@ -893,7 +982,7 @@ const FeedbackForm = () => {
                       helperText={formik.touched.otherReason && formik.errors.otherReason}
                       sx={{ 
                         mt: { xs: 1, sm: 2 },
-                        mb: { xs: 1.5, sm: 3 },
+                        mb: { xs: 1.5, sm: 0 },
                         '& .MuiFormHelperText-root': {
                           mt: { xs: 0.5, sm: 1 }
                         }
@@ -908,7 +997,7 @@ const FeedbackForm = () => {
                 <Typography 
                   variant="subtitle2" 
                   gutterBottom
-                  sx={{ color: 'primary.main' }}
+                  sx={{ color: 'primary.main' ,mt: 0,pt: 0}}
                 >
                   What aspects did you enjoy? (Optional)
                 </Typography>
@@ -917,7 +1006,7 @@ const FeedbackForm = () => {
                     display: 'flex', 
                     flexWrap: 'wrap', 
                     gap: 1,
-                    mt: 1
+                    mt: 1.5
                   }}
                 >
                   {aspects.map((aspect) => {
@@ -1155,7 +1244,7 @@ const FeedbackForm = () => {
             >
               Close
             </Button>
-            <Button
+            {/* <Button
               onClick={() => window.open('https://flourish.ly', '_blank')}
               variant="contained"
               color="warning"
@@ -1172,7 +1261,7 @@ const FeedbackForm = () => {
               }}
             >
               Register Now
-            </Button>
+            </Button> */}
           </Box>
         </Box>
       </Dialog>

@@ -69,7 +69,7 @@ const formatDate = (dateString) => {
   return { formattedDate, formattedTime };
 };
 
-const SessionDetails = () => {
+const SessionDetails = ({ compact }) => {
   const [session, setSession] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -79,8 +79,8 @@ const SessionDetails = () => {
       try {
         setLoading(true);
         const urlParams = new URLSearchParams(window.location.search);
-        const speakerId = urlParams.get("speakerId") || "recE5itVQWSprouSR";
-        const sessionId = urlParams.get("sessionId") || "recOJ2j4iq7j15dlJ";
+        const speakerId = urlParams.get("speakerid") || "recE5itVQWSprouSR";
+        const sessionId = urlParams.get("sessionid") || "recOJ2j4iq7j15dlJ";
 
         const [speakerResponse, sessionResponse] = await Promise.all([
           axios.get(
@@ -136,13 +136,22 @@ const SessionDetails = () => {
         borderRadius: 3,
         bgcolor: 'background.paper',
         border: 'none',
-        boxShadow: { xs: 'none', md: '0 4px 24px rgba(0,0,0,0.12)' },
-        background: { xs: 'transparent', md: '#fff' },
+        boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
+        background: '#fff',
         transition: 'all 0.3s ease',
         '&:hover': {
-          transform: { xs: 'none', md: 'translateY(-4px)' },
-          boxShadow: { xs: 'none', md: '0 8px 32px rgba(0,0,0,0.15)' },
-        }
+          transform: 'translateY(-4px)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+        },
+        ...(compact && {
+          p: { xs: 1.5, sm: 2 },
+          boxShadow: 'none',
+          background: 'transparent',
+          '&:hover': {
+            transform: 'none',
+            boxShadow: 'none',
+          },
+        }),
       }}
     >
       <Grid container spacing={{ xs: 1.5, sm: 2 }} direction="column">
@@ -150,12 +159,12 @@ const SessionDetails = () => {
           <Typography
             variant="h6"
             sx={{
-              color: { xs: 'white', md: 'text.primary' },
+              color: 'text.primary',
               fontWeight: 700,
               mb: { xs: 0.5, sm: 1 },
               letterSpacing: "-0.02em",
               fontSize: { xs: "1.1rem", sm: "1.25rem" },
-              opacity: { xs: 0.95, md: 1 },
+              opacity: 1,
               lineHeight: 1.3,
             }}
           >
@@ -171,7 +180,7 @@ const SessionDetails = () => {
             mb: { xs: 1, sm: 2 },
             p: { xs: 1.25, sm: 1.5 },
             borderRadius: 2,
-            bgcolor: { xs: 'rgba(255,255,255,0.1)', md: 'grey.50' },
+            bgcolor: 'grey.50',
           }}>
             <Box
               sx={{
@@ -212,7 +221,7 @@ const SessionDetails = () => {
               <Typography
                 variant="subtitle1"
                 sx={{
-                  color: { xs: 'white', md: 'text.primary' },
+                  color: 'text.primary',
                   fontWeight: 600,
                   letterSpacing: "-0.01em",
                   fontSize: { xs: "0.9rem", sm: "1rem" },
@@ -225,8 +234,8 @@ const SessionDetails = () => {
               <Typography
                 variant="body2"
                 sx={{
-                  color: { xs: 'white', md: 'text.secondary' },
-                  opacity: { xs: 0.7, md: 0.9 },
+                  color: 'text.secondary',
+                  opacity: 0.9,
                   fontSize: { xs: "0.75rem", sm: "0.85rem" },
                   fontWeight: 500,
                 }}
@@ -260,11 +269,11 @@ const SessionDetails = () => {
               label={formattedDate}
               size="small"
               sx={{
-                bgcolor: { xs: 'rgba(255,255,255,0.1)', md: 'primary.50' },
-                color: { xs: 'white', md: 'primary.main' },
+                bgcolor: 'primary.50',
+                color: 'primary.main',
                 borderRadius: '6px',
                 '& .MuiChip-icon': {
-                  color: { xs: 'white', md: 'primary.main' },
+                  color: 'primary.main',
                 },
               }}
             />
@@ -273,11 +282,11 @@ const SessionDetails = () => {
               label={formattedTime}
               size="small"
               sx={{
-                bgcolor: { xs: 'rgba(255,255,255,0.1)', md: 'secondary.50' },
-                color: { xs: 'white', md: 'secondary.main' },
+                bgcolor: 'secondary.50',
+                color: 'secondary.main',
                 borderRadius: '6px',
                 '& .MuiChip-icon': {
-                  color: { xs: 'white', md: 'secondary.main' },
+                  color: 'secondary.main',
                 },
               }}
             />
