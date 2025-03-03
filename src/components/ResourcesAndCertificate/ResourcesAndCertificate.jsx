@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import PropTypes from "prop-types";
 import {
   Box,
@@ -20,6 +20,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogActions,
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
 import PreviewIcon from "@mui/icons-material/Preview";
@@ -32,6 +33,7 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import CloseIcon from "@mui/icons-material/Close";
 import {
   getSessionDetailsAndResources,
+  getSessionDetailsAndToolsResources,
   getUserDetails,
 } from "../../utils/airtable";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
@@ -569,6 +571,7 @@ const ResourcesAndCertificate = () => {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get("sessionid");
   const studentId = searchParams.get("studentid");
+  const navigate = useNavigate();
 
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -577,31 +580,42 @@ const ResourcesAndCertificate = () => {
   const [userData, setUserData] = useState(null);
   const [resources, setResources] = useState([]);
   const certificateRef = useRef(null);
+  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
+  const [sessionDetials, setSessionDetials] = useState(null);
+  const [resourcesData, setResourcesData] = useState(null);
+  const [showNotRegisteredDialog, setShowNotRegisteredDialog] = useState(false);
 
-  const downloadCertificate = async () => {
-    if (!certificateRef.current) return;
-    
-    try {
-      const canvas = await html2canvas(certificateRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      });
-      
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'px',
-        format: [canvas.width, canvas.height]
-      });
-      
-      pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
-      pdf.save(`${certificateData.name}_certificate.pdf`);
-    } catch (error) {
-      console.error('Error generating certificate:', error);
-      setError('Failed to generate certificate');
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        if (!sessionDetials) return;
+        
+        setLoading(true);
+        const response = await getSessionDetailsAndToolsResources(sessionDetials);
+        // Filter for resources that are shown
+        const availableResources = response.filter(
+          record => record.fields.type === "resource" && record.fields.show === "Yes"
+        );
+        
+        // Extract resources from the first available resource record
+        if (availableResources.length > 0) {
+          setResources(availableResources[0]?.fields?.resources || []);
+        } else {
+          setResources([]);
+        }
+      } catch (err) {
+        console.error("Error fetching resources:", err);
+        setError("Failed to fetch resources");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Only fetch resources when on resources tab
+    if (tabValue === 1) {
+      fetchData();
     }
-  };
+  }, [sessionDetials, tabValue]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -613,11 +627,26 @@ const ResourcesAndCertificate = () => {
           getSessionDetailsAndResources(sessionId),
           getUserDetails(studentId),
         ]);
-
+         console.log(sessionData?.fields?.session_id !== userDetails.fields.session_id_pg[0]);
+        // Check if sessioconsn IDs match
+        console.log(userDetails.fields.session_id_pg[0]);
+        console.log(sessionData?.fields?.session_id);
+        if (sessionData?.fields?.session_id !== userDetails.fields.session_id_pg[0]) {
+          setShowNotRegisteredDialog(true);
+          return;
+        }
+         
+        // Check if student has submitted feedback
+        if (!userDetails.fields.student_feedback || userDetails.fields.student_feedback.length === 0) {
+          setShowFeedbackDialog(true);
+          return;
+        }
+        console.log(sessionData);
+        setSessionDetials(sessionData?.fields?.session_id);
         setCertificateData({
           name: `${userDetails.fields.student_first_name} ${userDetails.fields.student_last_name}`,
           date: sessionData.fields.session_start_date,
-          courseName: sessionData.fields.session_topic,
+          courseName: sessionData.fields.topic_name,
           signatureImage: sessionData.fields.speaker_signature?.[0]?.url || '',
         });
 
@@ -643,8 +672,39 @@ const ResourcesAndCertificate = () => {
     window.open(url, "_blank");
   };
 
-  const handleCertificateDownload = () => {
-    console.log("Downloading certificate...");
+  const downloadCertificate = async () => {
+    if (!certificateRef.current) return;
+    
+    try {
+      const canvas = await html2canvas(certificateRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        width: 1000,
+        height: 600,
+        backgroundColor: '#fff',
+      });
+      
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [1000, 600]
+      });
+      
+      pdf.addImage(imgData, 'JPEG', 0, 0, 1000, 600);
+      pdf.save(`${certificateData.name}_certificate.pdf`);
+    } catch (error) {
+      console.error('Error generating certificate:', error);
+      setError('Failed to generate certificate');
+    }
+  };
+
+  // Handle feedback dialog close and redirect
+  const handleFeedbackRedirect = () => {
+    // Preserve all existing URL parameters
+    const currentParams = new URLSearchParams(window.location.search);
+    navigate(`/feedback?${currentParams.toString()+'&fromcertificate=yes'}`);
   };
 
   if (loading) {
@@ -662,9 +722,69 @@ const ResourcesAndCertificate = () => {
       </Container>
     );
   }
-
+console.log(certificateData);
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
+      {/* Feedback Required Dialog */}
+      <Dialog
+        open={showFeedbackDialog}
+        onClose={() => {}} // Empty function to prevent closing by clicking outside
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            p: 2,
+          }
+        }}
+      >
+        <DialogTitle sx={{ textAlign: 'center', pt: 3 }}>
+          Feedback Required
+        </DialogTitle>
+        <DialogContent sx={{ textAlign: 'center', py: 2 }}>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Please provide your feedback to access the certificate and resources.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
+          <Button
+            variant="contained"
+            onClick={handleFeedbackRedirect}
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              py: 1,
+              textTransform: 'none',
+            }}
+          >
+            Give Feedback
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Not Registered Dialog */}
+      <Dialog
+        open={showNotRegisteredDialog}
+        onClose={() => {}}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            p: 2,
+          }
+        }}
+      >
+        <DialogTitle sx={{ textAlign: 'center', pt: 3 }}>
+          Not Registered
+        </DialogTitle>
+        <DialogContent sx={{ textAlign: 'center', py: 2 }}>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            You are not registered for this session.
+          </Typography>
+        </DialogContent>
+      </Dialog>
+
       <Box
         sx={{
           p: { xs: 1, sm: 2, md: 3 },
@@ -705,9 +825,9 @@ const ResourcesAndCertificate = () => {
                     mb: 3,
                     overflow: 'auto',
                     '& > div': {
-                      minWidth: { xs: '100%', sm: '600px' },
-                      transform: { xs: 'scale(0.9)', sm: 'scale(1)' },
-                      transformOrigin: 'top center',
+                      minWidth: '1000px',
+                      transform: 'none',
+                      transformOrigin: 'center',
                     }
                   }}
                 >
@@ -755,18 +875,24 @@ const ResourcesAndCertificate = () => {
 
         <TabPanel value={tabValue} index={1}>
           <Box sx={{ px: 2 }}>
-            <Grid container spacing={3}>
-              {resources.map((resource) => (
-                <Grid item xs={12} sm={6} md={4} key={resource.id}>
-                  <ResourceCard
-                    filename={resource.filename}
-                    url={resource.url}
-                    type={resource.type}
-                    thumbnails={resource.thumbnails}
-                  />
-                </Grid>
-              ))}
-            </Grid>
+            {resources && resources.length > 0 ? (
+              <Grid container spacing={3}>
+                {resources.map((resource, index) => (
+                  <Grid item xs={12} sm={6} md={4} key={resource.id || index}>
+                    <ResourceCard
+                      filename={resource.filename}
+                      url={resource.url}
+                      type={resource.type}
+                      thumbnails={resource.thumbnails}
+                    />
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Typography variant="body1" color="text.secondary" textAlign="center">
+                No resources available for this session.
+              </Typography>
+            )}
           </Box>
         </TabPanel>
       </Box>

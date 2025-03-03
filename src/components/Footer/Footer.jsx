@@ -28,23 +28,16 @@ const Footer = () => {
     <Box
       component="footer"
       sx={{
-        py: 3,
-        px: 2,
-        mt: 'auto',
-        backgroundColor: 'background.paper',
-        borderTop: '1px solid',
-        borderColor: 'divider',
-        position: 'relative',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '2px',
-          background: 'linear-gradient(90deg, #6366F1, #D946EF)',
-          opacity: 0.7
-        }
+        bottom: 0,
+        left: 0,
+        right: 0,
+        py: { xs: 1.5, sm: 2 },
+        px: { xs: 2, sm: 3 },
+        background: 'rgba(255, 255, 255, 0.1)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        borderTop: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.05)',
       }}
     >
       <Container maxWidth="lg">
