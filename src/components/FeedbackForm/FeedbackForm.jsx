@@ -279,7 +279,6 @@ const FeedbackForm = () => {
           firstName: true,
           lastName: true,
           email: true,
-          // whatsappNumber: true,
         });
 
         setIsFormEnabled(true);
@@ -305,7 +304,7 @@ const FeedbackForm = () => {
       firstName: "",
       lastName: "",
       email: "",
-      // whatsappNumber: "",
+      whatsappNumber: "",
       rating: "",
       lowRatingReason: "",
       otherReason: "",
@@ -380,83 +379,7 @@ const FeedbackForm = () => {
     },
   });
 
-  // Add useEffect hooks after all function definitions
-  useEffect(() => {
-    const checkSessionTime = async () => {
-      try {
-        const sessionId = searchParams.get("sessionid");
-        if (sessionId) {
-          const sessionDetails = await getSessionDetailsAndResources(sessionId);
-          const sessionDate = new Date(
-            sessionDetails.fields.session_start_date,
-          );
-          setSessionStartTime(sessionDate);
-
-          // Store session image if available
-          if (sessionDetails.fields.session_details_image) {
-            setSessionImage(sessionDetails.fields.session_details_image[0].url);
-          }
-
-          // Store session details
-          setSessionDetails({
-            topic: sessionDetails.fields.topic_name || "",
-            date: sessionDetails.fields.session_start_date || "",
-            duration: sessionDetails.fields.duration_minute || "",
-            sessionId: sessionDetails.fields.session_id || "",
-          });
-
-          // Check if feedback is disabled for this session
-          if (sessionDetails.fields.show_feedback === "no") {
-            navigate("/not-started", {
-              state: {
-                sessionStartTime: sessionDetails.fields.session_start_date,
-              },
-            });
-            return;
-          }
-
-          // Check if current time is before session start time
-          const now = new Date();
-          setIsSessionStarted(!isBefore(now, sessionDate));
-        }
-      } catch (error) {
-        console.error("Error checking session time:", error);
-      }
-    };
-    checkSessionTime();
-  }, []);
-
-  useEffect(() => {
-    const studentId = searchParams.get("studentid");
-    if (studentId) {
-      fetchUserDataById(studentId);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (rating) {
-      formik.setFieldValue("rating", rating);
-    }
-  }, [rating]);
-
-  useEffect(() => {
-    if (lowRatingReason) {
-      formik.setFieldValue("lowRatingReason", lowRatingReason);
-    }
-  }, [lowRatingReason]);
-
-  useEffect(() => {
-    if (otherReason) {
-      formik.setFieldValue("otherReason", otherReason);
-    }
-  }, [otherReason]);
-
-  // Early return if session hasn't started
-  if (!isSessionStarted && sessionStartTime) {
-    return <SessionNotStarted sessionStartTime={sessionStartTime} />;
-  }
-
-  // Function to fetch user data by Email
+  // Function to fetch user data by Email - Moved up before conditional returns
   const fetchUserDataByEmail = useCallback(
     async (email) => {
       if (!emailRegex.test(email)) {
@@ -465,7 +388,7 @@ const FeedbackForm = () => {
 
       try {
         const response = await fetch(
-        `https://api.airtable.com/v0/appiDWCj01hUW5CtW/tblxRTVl1GCaKjuLU?filterByFormula=AND(%7Bstudent_email_id%7D%3D%22${email}%22%2C%7Bsession_id_pg%7D%3D%22${sessionDetails?.sessionId}%22)`,
+          `https://api.airtable.com/v0/appiDWCj01hUW5CtW/tblxRTVl1GCaKjuLU?filterByFormula=AND(%7Bstudent_email_id%7D%3D%22${email}%22%2C%7Bsession_id_pg%7D%3D%22${sessionDetails?.sessionId}%22)`,
           {
             headers: {
               Authorization: `Bearer ${import.meta.env.VITE_AIRTABLE_API_KEY}`,
@@ -486,9 +409,7 @@ const FeedbackForm = () => {
             email: Array.isArray(userData.fields.student_email_id)
               ? userData.fields.student_email_id[0].replace(/"/g, "")
               : userData.fields.student_email_id || "",
-            whatsappNumber: Array.isArray(
-              userData.fields.student_whatsapp_number,
-            )
+            whatsappNumber: Array.isArray(userData.fields.student_whatsapp_number)
               ? userData.fields.student_whatsapp_number[0].replace(/"/g, "")
               : userData.fields.student_whatsapp_number || "",
           };
@@ -501,7 +422,6 @@ const FeedbackForm = () => {
             student_whatsapp_number: cleanData.whatsappNumber,
           });
 
-          // Update formik values
           formik.setValues(
             {
               ...formik.values,
@@ -523,8 +443,79 @@ const FeedbackForm = () => {
         setError(true);
       }
     },
-    [formik],
+    [formik, sessionDetails?.sessionId],
   );
+
+  // Add useEffect hooks
+  useEffect(() => {
+    const checkSessionTime = async () => {
+      try {
+        const sessionId = searchParams.get("sessionid");
+        if (sessionId) {
+          const sessionDetails = await getSessionDetailsAndResources(sessionId);
+          const sessionDate = new Date(sessionDetails.fields.session_start_date);
+          setSessionStartTime(sessionDate);
+
+          if (sessionDetails.fields.session_details_image) {
+            setSessionImage(sessionDetails.fields.session_details_image[0].url);
+          }
+
+          setSessionDetails({
+            topic: sessionDetails.fields.topic_name || "",
+            date: sessionDetails.fields.session_start_date || "",
+            duration: sessionDetails.fields.duration_minute || "",
+            sessionId: sessionDetails.fields.session_id || "",
+          });
+
+          if (sessionDetails.fields.show_feedback === "no") {
+            navigate("/not-started", {
+              state: {
+                sessionStartTime: sessionDetails.fields.session_start_date,
+              },
+            });
+            return;
+          }
+
+          const now = new Date();
+          const isStarted = !isBefore(now, sessionDate);
+          setIsSessionStarted(isStarted);
+        }
+      } catch (error) {
+        console.error("Error checking session time:", error);
+      }
+    };
+    checkSessionTime();
+  }, [navigate]);
+
+  useEffect(() => {
+    const studentId = searchParams.get("studentid");
+    if (studentId) {
+      fetchUserDataById(studentId);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (rating) {
+      formik.setFieldValue("rating", rating);
+    }
+  }, [rating, formik]);
+
+  useEffect(() => {
+    if (lowRatingReason) {
+      formik.setFieldValue("lowRatingReason", lowRatingReason);
+    }
+  }, [lowRatingReason, formik]);
+
+  useEffect(() => {
+    if (otherReason) {
+      formik.setFieldValue("otherReason", otherReason);
+    }
+  }, [otherReason, formik]);
+
+  // Early return after all hooks are defined
+  if (!isSessionStarted && sessionStartTime) {
+    return <SessionNotStarted sessionStartTime={sessionStartTime} />;
+  }
 
   // Handle email input change
   const handleEmailChange = (e) => {
@@ -1090,22 +1081,13 @@ const FeedbackForm = () => {
                     size="small"
                     type="text"
                     label="WhatsApp Number"
-                    placeholder="Your WhatsApp Mumber"
+                    placeholder="Your WhatsApp Number"
                     required
-                    value={formik.values.whatsappNumber}
-                    // onChange={handleWhatsappChange}
-                    // error={
-                    //   formik.touched.whatsappNumber &&
-                    //   Boolean(formik.errors.whatsappNumber)
-                    // }
-                    // helperText={
-                    //   formik.touched.whatsappNumber &&
-                    //   formik.errors.whatsappNumber
-                    // }
+                    value={formik.values.whatsappNumber || ""}
+                    name="whatsappNumber"
                     inputProps={{
                       maxLength: 10,
                       inputMode: "numeric",
-                      // pattern: "[0-9]*",
                     }}
                     sx={{
                       "& .MuiOutlinedInput-root": {

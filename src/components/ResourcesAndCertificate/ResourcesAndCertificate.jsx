@@ -722,7 +722,6 @@ const ResourcesAndCertificate = () => {
       </Container>
     );
   }
-console.log(certificateData);
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Feedback Required Dialog */}
@@ -875,7 +874,11 @@ console.log(certificateData);
 
         <TabPanel value={tabValue} index={1}>
           <Box sx={{ px: 2 }}>
-            {resources && resources.length > 0 ? (
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : resources && resources.length > 0 ? (
               <Grid container spacing={3}>
                 {resources.map((resource, index) => (
                   <Grid item xs={12} sm={6} md={4} key={resource.id || index}>
