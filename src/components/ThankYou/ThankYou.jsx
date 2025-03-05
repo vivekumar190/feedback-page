@@ -4,11 +4,15 @@ import { useEffect } from "react";
 import confetti from 'canvas-confetti';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import SchoolIcon from '@mui/icons-material/School';
+import { trackEvent, EVENTS } from "../../utils/amplitude";
 
 const ThankYou = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Track page view when component mounts
+    trackEvent(EVENTS.THANK_YOU_PAGE_VIEWED);
+
     // Fire initial confetti burst
     const duration = .7 * 1000;
     const animationEnd = Date.now() + duration;

@@ -1,21 +1,17 @@
 import axios from 'axios';
 
-const AIRTABLE_API_KEY = import.meta.env.VITE_AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = import.meta.env.VITE_AIRTABLE_BASE_ID;
-const SESSION_TABLE_ID = 'tblgUfc6jVKd57W7T';
-const STUDENT_TABLE_ID = 'tblxRTVl1GCaKjuLU';
-const SESSION_DETAILS_TABLE_ID = 'tblgUfc6jVKd57W7T';
-const airtableApi = axios.create({
-  baseURL: `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}`,
+const API_BASE_URL = 'http://localhost:5000/api';
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
   headers: {
-    Authorization: `Bearer ${AIRTABLE_API_KEY}`,
     'Content-Type': 'application/json',
   },
 });
 
 export const getSessionDetailsAndResources = async (sessionId) => {
   try {
-    const response = await airtableApi.get(`/${SESSION_TABLE_ID}/${sessionId}`);
+    const response = await api.get(`/session/${sessionId}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching session details and resources:', error);
@@ -25,7 +21,7 @@ export const getSessionDetailsAndResources = async (sessionId) => {
 
 export const getUserDetails = async (studentId) => {
   try {
-    const response = await airtableApi.get(`/${STUDENT_TABLE_ID}/${studentId}`);
+    const response = await api.get(`/user/${studentId}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching user details:', error);
@@ -33,26 +29,20 @@ export const getUserDetails = async (studentId) => {
   }
 };
 
-
 export const getSpeakerDetails = async (sessionId) => {
   try {
-    const response = await airtableApi.get(`/${SESSION_DETAILS_TABLE_ID}/?filterByFormula=AND(%7Bsession_id%7D%3D%22${sessionId}%22%2C%7Btype%7D%3D%22Speaker%22)`);
+    const response = await api.get(`/speaker/${sessionId}`);
     return response?.data;
   } catch (error) {
-    console.error('Error fetching user details:', error);
+    console.error('Error fetching speaker details:', error);
     throw error;
   }
 };
 
 export const getSessionResources = async (sessionId) => {
   try {
-    const response = await airtableApi.get(`/${SESSION_TABLE_ID}`, {
-      params: {
-        filterByFormula: `{session_id}='${sessionId}'`,
-        view: 'Grid view',
-      },
-    });
-    return response.data.records;
+    const response = await api.get(`/resources/${sessionId}`);
+    return response.data;
   } catch (error) {
     console.error('Error fetching resources:', error);
     throw error;
@@ -61,10 +51,8 @@ export const getSessionResources = async (sessionId) => {
 
 export const getSessionDetailsAndToolsResources = async (sessionId) => {
   try {
-    const response = await airtableApi.get(`/${SESSION_DETAILS_TABLE_ID}?filterByFormula=${encodeURIComponent(`{session_id_pg}="${sessionId}"`)}`, {
-    
-    });
-    return response.data.records;
+    const response = await api.get(`/session-tools/${sessionId}`);
+    return response.data;
   } catch (error) {
     console.error('Error fetching session details and tools resources:', error);
     throw error;

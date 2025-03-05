@@ -21,6 +21,7 @@ import SpeakerCard from "../SessionDetailsCard/SpeakerCard";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import { format } from "date-fns";
+import { trackEvent, EVENTS } from "../../utils/amplitude";
 
 const MenuCard = ({ title, icon: Icon, onClick, sx = {} }) => (
   <Card
@@ -168,6 +169,12 @@ const Menu = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
+  
+  // Add UTM parameter extraction
+  const utmSource = searchParams.get("utm_source") || "";
+  const utmMedium = searchParams.get("utm_medium") || "";
+  const utmCampaign = searchParams.get("utm_campaign") || "";
+
   const [sessionDetails, setSessionDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -187,14 +194,22 @@ const Menu = () => {
         const response = await getSessionDetailsAndResources(sessionId);
         setSessionDetails(response.fields);
 
-       
+        // Track page view after session details are loaded
+        trackEvent(EVENTS.MENU_PAGE_VIEWED, {
+          sessionId: response.fields?.session_id,
+          sessionDate: response.fields?.session_start_date,
+          topicName: response.fields?.topic_name,
+          utm_source: utmSource,
+          utm_medium: utmMedium,
+          utm_campaign: utmCampaign
+        });
+
         try {
-          const toolsResponse =
-            await getSessionDetailsAndToolsResources(sessionDetails?.session_id);
-      // Filter for speakers that are shown
-      const tools = toolsResponse.filter(
-        record => record.fields.type === "Tool" && record.fields.show === "Yes"
-      );
+          const toolsResponse = await getSessionDetailsAndToolsResources(response.fields?.session_id);
+          // Filter for tools that are shown
+          const tools = toolsResponse.filter(
+            record => record.fields.type === "Tool" && record.fields.show === "Yes"
+          );
           setToolsData(tools);
         } catch (toolsErr) {
           console.error("Error fetching tools data:", toolsErr);
@@ -210,44 +225,54 @@ const Menu = () => {
     };
 
     fetchSessionDetails();
-  }, [sessionDetails?.session_id]);
-useEffect(() => {
-  const fetchData = async () => {
-    try {
-      if (!sessionDetails?.sessionId) return;
-      
-      setLoading(true);
-      const response = await getSessionDetailsAndToolsResources(sessionDetails?.session_id);
-      // Filter for speakers that are shown
-      const speakers = response.filter(
-        record => record.fields.type === "Tool" && record.fields.show === "Yes"
-      );
-      
-      setToolsData(speakers);
-    } catch (err) {
-      console.error("Error fetching Tool details:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-  fetchData();
-}, [sessionDetails?.session_id]);
-  console.log(toolsData);
+  }, [utmSource, utmMedium, utmCampaign]); // Only re-run if UTM parameters change
+
   const navigateWithParams = (path) => {
     // Get all current URL parameters
     const sessionId = searchParams.get("sessionid");
     const studentId = searchParams.get("studentid");
     const speakerId = searchParams.get("speakerid");
 
+    // Track click events based on path with UTM parameters
+    if (path === "/feedback") {
+      trackEvent(EVENTS.FEEDBACK_LINK_CLICKED, { 
+        sessionId: sessionDetails?.session_id,
+        sessionDate: sessionDetails?.session_start_date,
+        topicName: sessionDetails?.topic_name,
+        utm_source: utmSource,
+        utm_medium: utmMedium,
+        utm_campaign: utmCampaign
+      });
+    }
+
     // Build new query string with all parameters
     const queryParams = new URLSearchParams();
     if (sessionId) queryParams.append("sessionid", sessionId);
     if (studentId) queryParams.append("studentid", studentId);
     if (speakerId) queryParams.append("speakerid", speakerId);
+    if (utmSource) queryParams.append("utm_source", utmSource);
+    if (utmMedium) queryParams.append("utm_medium", utmMedium);
+    if (utmCampaign) queryParams.append("utm_campaign", utmCampaign);
 
     // Navigate with all parameters
     const queryString = queryParams.toString();
     navigate(`${path}${queryString ? `?${queryString}` : ""}`);
+  };
+
+  // Add tracking for tool clicks
+  const handleToolClick = (tool) => {
+    // Track tool click with UTM parameters and session data
+    trackEvent(EVENTS.TOOL_CLICKED, {
+      toolName: tool.fields.name,
+      toolType: tool.fields.type,
+      toolLink: tool.fields.link,
+      sessionId: sessionDetails?.session_id,
+      sessionDate: sessionDetails?.session_start_date,
+      topicName: sessionDetails?.topic_name,
+      utm_source: utmSource,
+      utm_medium: utmMedium,
+      utm_campaign: utmCampaign
+    });
   };
 
   if (loading) {
@@ -537,6 +562,7 @@ useEffect(() => {
                         href={tool.fields.link}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => handleToolClick(tool)}
                         sx={{ 
                           textDecoration: "none",
                           display: "block",

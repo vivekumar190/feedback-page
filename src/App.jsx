@@ -8,6 +8,8 @@ import Header from './components/Header/Header';
 import ThankYou from './components/ThankYou/ThankYou';
 import BackgroundShapes from './components/BackgroundElements/BackgroundShapes';
 import SessionNotStarted from './components/SessionNotStarted/SessionNotStarted';
+import { useEffect } from 'react';
+import { initAmplitude } from './utils/amplitude';
 
 const theme = createTheme({
   palette: {
@@ -53,6 +55,11 @@ const theme = createTheme({
 });
 
 function App() {
+  useEffect(() => {
+    // Initialize Amplitude
+    initAmplitude();
+  }, []);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />

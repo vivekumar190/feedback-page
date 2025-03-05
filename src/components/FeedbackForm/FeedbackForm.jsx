@@ -46,6 +46,7 @@ import { format, isBefore } from "date-fns";
 import SessionNotStarted from "../SessionNotStarted/SessionNotStarted";
 import { getSessionDetailsAndResources } from "../../utils/airtable";
 import SpeakerCard from "../SessionDetailsCard/SpeakerCard";
+import { trackEvent, EVENTS } from "../../utils/amplitude";
 
 const FeatureBox = ({ icon: Icon, title, description }) => (
   <Box
@@ -225,6 +226,11 @@ const FeedbackForm = () => {
   // Email validation regex
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
+  // Add UTM parameter extraction
+  const utmSource = searchParams.get("utm_source") || "";
+  const utmMedium = searchParams.get("utm_medium") || "";
+  const utmCampaign = searchParams.get("utm_campaign") || "";
+
   // Function to fetch user data by student ID
   const fetchUserDataById = async (studentId) => {
     try {
@@ -315,7 +321,8 @@ const FeedbackForm = () => {
     onSubmit: async (values) => {
       try {
         setSubmitting(true);
-        // const sessionId = searchParams.get("sessionid");
+        
+        // Submit feedback to Airtable
         const response = await fetch(
           "https://api.airtable.com/v0/appiDWCj01hUW5CtW/tblVK77VaisYt94Ne",
           {
@@ -351,6 +358,26 @@ const FeedbackForm = () => {
             errorData.error?.message || "Failed to submit feedback",
           );
         }
+
+        // Track feedback submission with UTM parameters
+        trackEvent(EVENTS.FEEDBACK_SUBMITTED, {
+          rating: values.rating,
+          hasLowRating: values.rating <= 6,
+          lowRatingReason: values.lowRatingReason || null,
+          aspectsCount: values.aspects?.length || 0,
+          hasSuggestions: Boolean(values.suggestions),
+          user_id: values.email,
+          email: values.email,
+          phone: values.whatsappNumber,
+          firstName: values.firstName,
+          lastName: values.lastName,
+          sessionId: sessionDetails.sessionId,
+          sessionDate: sessionDetails.date,
+          topicName: sessionDetails.topic,
+          utm_source: utmSource,
+          utm_medium: utmMedium,
+          utm_campaign: utmCampaign
+        });
 
         setOpenSuccessDialog(true);
 
@@ -467,7 +494,12 @@ const FeedbackForm = () => {
             sessionId: sessionDetails.fields.session_id || "",
           });
 
-          if (sessionDetails.fields.show_feedback === "no") {
+          const now = new Date();
+          const isStarted = !isBefore(now, sessionDate);
+          setIsSessionStarted(isStarted);
+
+          // If session hasn't started, navigate to not-started page
+          if (!isStarted) {
             navigate("/not-started", {
               state: {
                 sessionStartTime: sessionDetails.fields.session_start_date,
@@ -476,16 +508,31 @@ const FeedbackForm = () => {
             return;
           }
 
-          const now = new Date();
-          const isStarted = !isBefore(now, sessionDate);
-          setIsSessionStarted(isStarted);
+          // Track page view after session details are loaded
+          trackEvent(EVENTS.FEEDBACK_PAGE_VIEWED, {
+            utm_source: utmSource,
+            utm_medium: utmMedium,
+            utm_campaign: utmCampaign,
+            sessionId: sessionDetails.fields.session_id,
+            sessionDate: sessionDetails.fields.session_start_date,
+            topicName: sessionDetails.fields.topic_name
+          });
+
+          if (sessionDetails.fields.show_feedback === "no") {
+            navigate("/not-started", {
+              state: {
+                sessionStartTime: sessionDetails.fields.session_start_date,
+              },
+            });
+            return;
+          }
         }
       } catch (error) {
         console.error("Error checking session time:", error);
       }
     };
     checkSessionTime();
-  }, [navigate]);
+  }, [navigate, utmSource, utmMedium, utmCampaign]);
 
   useEffect(() => {
     const studentId = searchParams.get("studentid");
@@ -511,11 +558,6 @@ const FeedbackForm = () => {
       formik.setFieldValue("otherReason", otherReason);
     }
   }, [otherReason, formik]);
-
-  // Early return after all hooks are defined
-  if (!isSessionStarted && sessionStartTime) {
-    return <SessionNotStarted sessionStartTime={sessionStartTime} />;
-  }
 
   // Handle email input change
   const handleEmailChange = (e) => {

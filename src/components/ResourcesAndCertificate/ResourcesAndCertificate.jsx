@@ -40,6 +40,7 @@ import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import CertificateTemplate from '../Certificate/CertificateTemplate';
+import { trackEvent, EVENTS } from "../../utils/amplitude";
 
 const TabPanel = ({ children, value, index, ...other }) => (
   <Box
@@ -59,11 +60,12 @@ TabPanel.propTypes = {
   index: PropTypes.number.isRequired,
 };
 
-const ResourceCard = ({ filename, url, type, thumbnails }) => {
+const ResourceCard = ({ filename, url, type, thumbnails, onDownload, onPreview }) => {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const handlePreview = () => {
     setPreviewOpen(true);
+    onPreview && onPreview();
   };
 
   const handleClose = () => {
@@ -82,6 +84,7 @@ const ResourceCard = ({ filename, url, type, thumbnails }) => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
+      onDownload && onDownload();
     } catch (error) {
       console.error("Error downloading file:", error);
     }
@@ -293,6 +296,8 @@ ResourceCard.propTypes = {
       url: PropTypes.string.isRequired,
     }),
   }),
+  onDownload: PropTypes.func,
+  onPreview: PropTypes.func,
 };
 
 const CertificatePreview = ({ userData, onDownload }) => (
@@ -573,6 +578,11 @@ const ResourcesAndCertificate = () => {
   const studentId = searchParams.get("studentid");
   const navigate = useNavigate();
 
+  // Add UTM parameters extraction
+  const utmSource = searchParams.get("utm_source") || "";
+  const utmMedium = searchParams.get("utm_medium") || "";
+  const utmCampaign = searchParams.get("utm_campaign") || "";
+
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -584,6 +594,24 @@ const ResourcesAndCertificate = () => {
   const [sessionDetials, setSessionDetials] = useState(null);
   const [resourcesData, setResourcesData] = useState(null);
   const [showNotRegisteredDialog, setShowNotRegisteredDialog] = useState(false);
+  const [eventProperties, setEventProperties] = useState(null);
+
+  useEffect(() => {
+    // Track page view when component mounts
+    trackEvent(EVENTS.CERTIFICATE_PAGE_VIEWED, {
+      user_id: userData?.fields?.student_email_id[0],
+      email: userData?.fields?.student_email_id[0],
+      phone: userData?.fields?.student_whatsapp_number[0],
+      firstName: userData?.fields?.student_first_name[0],
+      lastName: userData?.fields?.student_last_name[0],
+      sessionId: sessionId,
+      sessionDate: certificateData?.date,
+      topicName: certificateData?.courseName,
+      utm_source: utmSource,
+      utm_medium: utmMedium,
+      utm_campaign: utmCampaign
+    });
+  }, [utmSource, utmMedium, utmCampaign, userData?.fields, sessionId, certificateData]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -627,11 +655,11 @@ const ResourcesAndCertificate = () => {
           getSessionDetailsAndResources(sessionId),
           getUserDetails(studentId),
         ]);
-         console.log(sessionData?.fields?.session_id !== userDetails.fields.session_id_pg[0]);
+         console.log(sessionData?.fields?.session_id !== userDetails?.fields?.session_id_pg?.[0]);
         // Check if sessioconsn IDs match
-        console.log(userDetails.fields.session_id_pg[0]);
+        console.log(userDetails?.fields?.session_id_pg?.[0]);
         console.log(sessionData?.fields?.session_id);
-        if (sessionData?.fields?.session_id !== userDetails.fields.session_id_pg[0]) {
+        if (sessionData?.fields?.session_id !== userDetails?.fields?.session_id_pg?.[0]) {
           setShowNotRegisteredDialog(true);
           return;
         }
@@ -644,14 +672,35 @@ const ResourcesAndCertificate = () => {
         console.log(sessionData);
         setSessionDetials(sessionData?.fields?.session_id);
         setCertificateData({
-          name: `${userDetails.fields.student_first_name} ${userDetails.fields.student_last_name}`,
-          date: sessionData.fields.session_start_date,
-          courseName: sessionData.fields.topic_name,
-          signatureImage: sessionData.fields.speaker_signature?.[0]?.url || '',
+          name: `${userDetails?.fields?.student_first_name} ${userDetails?.fields?.student_last_name}`,
+          date: sessionData?.fields?.session_start_date,
+          courseName: sessionData?.fields?.topic_name,
+          signatureImage: sessionData?.fields?.speaker_signature?.[0]?.url || '',
         });
 
         setUserData(userDetails);
-        setResources(sessionData.fields.resources || []);
+        // Store session data for tracking
+        const sessionStartDate = sessionData?.fields?.session_start_date;
+        const topicName = sessionData?.fields?.topic_name;
+
+        // Update the tracking events with session data and UTM parameters
+        const commonEventProperties = {
+          user_id: userDetails?.fields?.student_email_id[0],
+          email: userDetails?.fields?.student_email_id[0],
+          phone: userDetails?.fields?.student_whatsapp_number[0],
+          firstName: userDetails?.fields?.student_first_name[0],
+          lastName: userDetails?.fields?.student_last_name[0],
+          sessionId: sessionId,
+          sessionDate: sessionStartDate,
+          topicName: topicName,
+          utm_source: utmSource,
+          utm_medium: utmMedium,
+          utm_campaign: utmCampaign
+        };
+
+        // Store these in state for use in other event tracking
+        setEventProperties(commonEventProperties);
+        setResources(sessionData?.fields?.resources || []);
       } catch (err) {
         setError(err.message || "Failed to load data. Please try again later.");
         console.error(err);
@@ -666,7 +715,7 @@ const ResourcesAndCertificate = () => {
       setError("Missing required parameters");
       setLoading(false);
     }
-  }, [sessionId, studentId]);
+  }, [sessionId, studentId, utmSource, utmMedium, utmCampaign]);
 
   const handleDownload = (url) => {
     window.open(url, "_blank");
@@ -694,6 +743,21 @@ const ResourcesAndCertificate = () => {
       
       pdf.addImage(imgData, 'JPEG', 0, 0, 1000, 600);
       pdf.save(`${certificateData.name}_certificate.pdf`);
+
+      // Track certificate download with enhanced properties
+      trackEvent(EVENTS.CERTIFICATE_DOWNLOADED, {
+        user_id: userData?.fields?.student_email_id[0],
+        email: userData?.fields?.student_email_id[0],
+        phone: userData?.fields?.student_whatsapp_number[0],
+        firstName: userData?.fields?.student_first_name[0],
+        lastName: userData?.fields?.student_last_name[0],
+        sessionId: sessionId,
+        sessionDate: certificateData?.date,
+        topicName: certificateData?.courseName,
+        utm_source: utmSource,
+        utm_medium: utmMedium,
+        utm_campaign: utmCampaign
+      });
     } catch (error) {
       console.error('Error generating certificate:', error);
       setError('Failed to generate certificate');
@@ -705,6 +769,49 @@ const ResourcesAndCertificate = () => {
     // Preserve all existing URL parameters
     const currentParams = new URLSearchParams(window.location.search);
     navigate(`/feedback?${currentParams.toString()+'&fromcertificate=yes'}`);
+  };
+
+  // Add tracking for resource interactions
+  useEffect(() => {
+    if (resourcesData?.length > 0) {
+      trackEvent(EVENTS.RESOURCE_VIEWED, {
+        resourceName: resourcesData[0]?.filename,
+        resourceType: resourcesData[0]?.type,
+        resourceLink: resourcesData[0]?.url,
+        resourceCount: resourcesData?.length,
+        user_id: userData?.fields?.student_email_id[0],
+        email: userData?.fields?.student_email_id[0],
+        phone: userData?.fields?.student_whatsapp_number[0],
+        firstName: userData?.fields?.student_first_name[0],
+        lastName: userData?.fields?.student_last_name[0],
+        sessionId: sessionId,
+        sessionDate: certificateData?.date,
+        topicName: certificateData?.courseName,
+        utm_source: utmSource,
+        utm_medium: utmMedium,
+        utm_campaign: utmCampaign
+      });
+    }
+  }, [resourcesData, userData?.fields, sessionId, certificateData, utmSource, utmMedium, utmCampaign]);
+
+  const handleResourceDownload = (resource) => {
+    trackEvent(EVENTS.RESOURCE_DOWNLOADED, {
+      resourceName: resource.fields.name,
+      resourceType: resource.fields.type,
+      resourceLink: resource.fields.link,
+      user_id: userData?.fields?.student_email_id[0],
+      email: userData?.fields?.student_email_id[0],
+      phone: userData?.fields?.student_whatsapp_number[0],
+      firstName: userData?.fields?.student_first_name[0],
+      lastName: userData?.fields?.student_last_name[0],
+      sessionId: sessionId,
+      sessionDate: certificateData?.date,
+      topicName: certificateData?.courseName,
+      utm_source: utmSource,
+      utm_medium: utmMedium,
+      utm_campaign: utmCampaign
+    });
+    window.open(resource.fields.link, '_blank');
   };
 
   if (loading) {
@@ -880,13 +987,49 @@ const ResourcesAndCertificate = () => {
               </Box>
             ) : resources && resources.length > 0 ? (
               <Grid container spacing={3}>
-                {resources.map((resource, index) => (
+                {resources?.map((resource, index) => (
                   <Grid item xs={12} sm={6} md={4} key={resource.id || index}>
                     <ResourceCard
                       filename={resource.filename}
                       url={resource.url}
                       type={resource.type}
                       thumbnails={resource.thumbnails}
+                      onDownload={() => {
+                        trackEvent(EVENTS.RESOURCE_DOWNLOADED, {
+                          resourceName: resource?.filename,
+                          resourceType: resource?.type,
+                          resourceLink: resource?.url,
+                          user_id: userData?.fields?.student_email_id[0],
+                          email: userData?.fields?.student_email_id[0],
+                          phone: userData?.fields?.student_whatsapp_number[0],
+                          firstName: userData?.fields?.student_first_name[0],
+                          lastName: userData?.fields?.student_last_name[0],
+                          sessionId: sessionId,
+                          sessionDate: certificateData?.date,
+                          topicName: certificateData?.courseName,
+                          utm_source: utmSource,
+                          utm_medium: utmMedium,
+                          utm_campaign: utmCampaign
+                        });
+                      }}
+                      onPreview={() => {
+                        trackEvent(EVENTS.RESOURCE_VIEWED, {
+                          resourceName: resource?.filename,
+                          resourceType: resource?.type,
+                          resourceLink: resource?.url,
+                          user_id: userData?.fields?.student_email_id[0],
+                          email: userData?.fields?.student_email_id[0],
+                          phone: userData?.fields?.student_whatsapp_number[0],
+                          firstName: userData?.fields?.student_first_name[0],
+                          lastName: userData?.fields?.student_last_name[0],
+                          sessionId: sessionId,
+                          sessionDate: certificateData?.date,
+                          topicName: certificateData?.courseName,
+                          utm_source: utmSource,
+                          utm_medium: utmMedium,
+                          utm_campaign: utmCampaign
+                        });
+                      }}
                     />
                   </Grid>
                 ))}
