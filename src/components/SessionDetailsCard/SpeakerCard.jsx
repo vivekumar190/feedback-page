@@ -145,7 +145,7 @@ const SpeakerCard = (sessionId) => {
                 },
               }}
             >
-              {speaker.fields.sub_type}
+              {speaker.fields.designation}
             </Typography>
           </Box>
         </Box>

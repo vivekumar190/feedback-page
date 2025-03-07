@@ -7,13 +7,21 @@ const CertificateTemplate = ({ certificateData }) => {
     <Box
       sx={{
         width: '1000px',
-        height: '600px',
+        height: '650px',
         bgcolor: '#fff',
         borderRadius: '24px',
-        overflow: 'hidden',
+        overflow: 'visible',
         position: 'relative',
         display: 'flex',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
+        boxShadow: '2px 4px 24px rgba(0,0,0,0.1)',
+        minWidth: '1000px',
+        minHeight: '600px',
+        transform: 'scale(1)',
+        transformOrigin: 'top left',
+        pageBreakInside: 'avoid',
+        breakInside: 'avoid',
+        WebkitPrintColorAdjust: 'exact',
+        printColorAdjust: 'exact',
       }}
     >
       {/* Left Sidebar with Shapes */}
@@ -23,7 +31,7 @@ const CertificateTemplate = ({ certificateData }) => {
           height: '100%',
           bgcolor: '#1A237E',
           position: 'relative',
-          overflow: 'hidden',
+          overflow: 'visible',
         }}
       >
         {/* Yellow Circle */}
@@ -135,7 +143,8 @@ const CertificateTemplate = ({ certificateData }) => {
         sx={{
           flex: 1,
           position: 'relative',
-          p: '40px 60px',
+          p: '40px 40px 40px 60px',
+          overflow: 'visible',
         }}
       >
         {/* Flourish Logo */}
@@ -156,7 +165,7 @@ const CertificateTemplate = ({ certificateData }) => {
         </Box>
 
         {/* Medal and Title */}
-        <Box sx={{ mb: 5 }}>
+        <Box sx={{ mb: 4 }}>
           <img
             src="/medal.png"
             alt="Medal"
@@ -198,7 +207,7 @@ const CertificateTemplate = ({ certificateData }) => {
               color: '#FF7B6B',
               fontWeight: 600,
               fontSize: '48px',
-              mb: 4,
+              mb: 2,
               letterSpacing: '-0.01em',
             }}
           >
@@ -227,7 +236,7 @@ const CertificateTemplate = ({ certificateData }) => {
             </Typography>
           </Typography>
 
-          <Box sx={{ mt: 2 }}>
+          <Box sx={{ mt: 1 }}>
             <Typography
               variant="h5"
               sx={{
@@ -242,49 +251,223 @@ const CertificateTemplate = ({ certificateData }) => {
           </Box>
         </Box>
 
-        {/* Signature */}
+        {/* Speakers Section */}
         <Box 
           sx={{ 
             position: 'absolute',
             bottom: 40,
-            right: 60,
+            width: '100%',
             display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
+            justifyContent: certificateData.speakers?.length === 1 ? 'flex-end' : 'space-between',
+            px: 0,
+            maxWidth: '800px',
+            mx: 'auto',
+            left: '50%',
+            transform: 'translateX(-50%)',
           }}
         >
-          {certificateData.signatureImage ? (
-            <img
-              src={certificateData.signatureImage}
-              alt="Signature"
-              style={{
-                height: '40px',
-                marginBottom: '8px',
-              }}
-            />
-          ) : (
-            <Typography
+          {certificateData.speakers?.length === 1 ? (
+            // Single speaker - show on right
+            <Box
               sx={{
-                fontFamily: 'Dancing Script, cursive',
-                fontSize: '32px',
-                color: '#1A237E',
-                mb: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: '120px',
               }}
             >
-              Smita Tripathi
-            </Typography>
+              {certificateData.speakers[0].image ? (
+                <Box
+                  sx={{
+                    width: '150px',
+                    height: '60px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    mb: 1,
+                  }}
+                >
+                  <img
+                    src={certificateData.speakers[0].image}
+                    alt={`${certificateData.speakers[0].name}'s Signature`}
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                      objectFit: 'contain',
+                    }}
+                  />
+                </Box>
+              ) : (
+                <Typography
+                  sx={{
+                    fontFamily: 'Dancing Script, cursive',
+                    fontSize: '32px',
+                    color: '#1A237E',
+                    mb: 1,
+                  }}
+                >
+                  {certificateData.speakers[0].name}
+                </Typography>
+              )}
+              <Typography
+                variant="body2"
+                sx={{
+                  color: '#1A237E',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  textAlign: 'center',
+                  mb: 0.5,
+                }}
+              >
+                {certificateData.speakers[0].name}
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: '#666',
+                  fontSize: '12px',
+                  textAlign: 'center',
+                }}
+              >
+                {certificateData.speakers[0].designation}
+              </Typography>
+            </Box>
+          ) : (
+            // Multiple speakers - split between left and right sides
+            <>
+              {/* Left side - First speaker */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  minWidth: '120px',
+                }}
+              >
+                {certificateData.speakers[0].image ? (
+                  <Box
+                    sx={{
+                      width: '150px',
+                      height: '60px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      mb: 1,
+                    }}
+                  >
+                    <img
+                      src={certificateData.speakers[0].image}
+                      alt={`${certificateData.speakers[0].name}'s Signature`}
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        objectFit: 'contain',
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Typography
+                    sx={{
+                      fontFamily: 'Dancing Script, cursive',
+                      fontSize: '32px',
+                      color: '#1A237E',
+                      mb: 1,
+                    }}
+                  >
+                    {certificateData.speakers[0].name}
+                  </Typography>
+                )}
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: '#1A237E',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    textAlign: 'center',
+                    mb: 0.5,
+                  }}
+                >
+                  {certificateData.speakers[0].name}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: '#666',
+                    fontSize: '12px',
+                    textAlign: 'center',
+                  }}
+                >
+                  {certificateData.speakers[0].designation}
+                </Typography>
+              </Box>
+
+              {/* Right side - Second speaker */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  minWidth: '120px',
+                }}
+              >
+                {certificateData.speakers[1].image ? (
+                  <Box
+                    sx={{
+                      width: '150px',
+                      height: '60px',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      justifyContent: 'center',
+                      mb: 1,
+                    }}
+                  >
+                    <img
+                      src={certificateData.speakers[1].image}
+                      alt={`${certificateData.speakers[1].name}'s Signature`}
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        objectFit: 'contain',
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Typography
+                    sx={{
+                      fontFamily: 'Dancing Script, cursive',
+                      fontSize: '32px',
+                      color: '#1A237E',
+                      mb: 1,
+                    }}
+                  >
+                    {certificateData.speakers[1].name}
+                  </Typography>
+                )}
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: '#1A237E',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    textAlign: 'center',
+                    mb: 0.5,
+                  }}
+                >
+                  {certificateData.speakers[1].name}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: '#666',
+                    fontSize: '12px',
+                    textAlign: 'center',
+                  }}
+                >
+                  {certificateData.speakers[1].designation}
+                </Typography>
+              </Box>
+            </>
           )}
-          <Typography 
-            variant="body2" 
-            sx={{ 
-              color: '#666',
-              letterSpacing: '0.1em',
-              fontSize: '12px',
-              textAlign: 'center',
-            }}
-          >
-            SIGNATURE
-          </Typography>
         </Box>
       </Box>
     </Box>
@@ -296,7 +479,11 @@ CertificateTemplate.propTypes = {
     name: PropTypes.string.isRequired,
     date: PropTypes.string.isRequired,
     courseName: PropTypes.string.isRequired,
-    signatureImage: PropTypes.string,
+    speakers: PropTypes.arrayOf(PropTypes.shape({
+      name: PropTypes.string.isRequired,
+      designation: PropTypes.string,
+      image: PropTypes.string,
+    })),
   }).isRequired,
 };
 

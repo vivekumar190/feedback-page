@@ -300,7 +300,7 @@ ResourceCard.propTypes = {
   onPreview: PropTypes.func,
 };
 
-const CertificatePreview = ({ userData, onDownload }) => (
+const CertificatePreview = ({ userData, onDownload, certificateData }) => (
   <Box sx={{ px: { xs: 1, sm: 2 } }}>
     <Box
       sx={{
@@ -507,39 +507,50 @@ const CertificatePreview = ({ userData, onDownload }) => (
           sx={{
             display: "flex",
             justifyContent: "center",
+            flexWrap: "wrap",
+            gap: 4,
             width: "100%",
             mt: { xs: 2, sm: 4 },
             px: { xs: 2, sm: 4 },
           }}
         >
-          <Box sx={{ textAlign: "center" }}>
-            <Box
-              sx={{
-                borderBottom: "2px solid",
-                borderColor: "primary.main",
-                width: { xs: 100, sm: 150 },
-                mb: 1,
-                pt: 3,
-              }}
-            >
-              <img
-                src="/signature.png"
-                alt="Signature"
-                style={{
-                  width: "100%",
-                  marginBottom: -15,
-                  opacity: 0.8,
+          {certificateData?.speakers?.map((speaker, index) => (
+            <Box key={index} sx={{ textAlign: "center" }}>
+              <Box
+                sx={{
+                  borderBottom: "2px solid",
+                  borderColor: "primary.main",
+                  width: { xs: 100, sm: 150 },
+                  mb: 1,
+                  pt: 3,
                 }}
-              />
+              >
+                <img
+                  src={speaker.image || "/signature.png"}
+                  alt={`Speaker ${index + 1}`}
+                  style={{
+                    width: "100%",
+                    marginBottom: -15,
+                    opacity: 0.8,
+                  }}
+                />
+              </Box>
+              <Typography
+                variant="body2"
+                fontWeight={500}
+                sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}
+              >
+                {speaker.name || `Speaker ${index + 1}`}
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontSize: { xs: "0.7rem", sm: "0.75rem" }, display: "block", mt: 0.5 }}
+              >
+                {speaker.designation || ""}
+              </Typography>
             </Box>
-            <Typography
-              variant="body2"
-              fontWeight={500}
-              sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}
-            >
-              Session Instructor
-            </Typography>
-          </Box>
+          ))}
         </Box>
 
         {/* Bottom Section */}
@@ -570,6 +581,17 @@ CertificatePreview.propTypes = {
     }),
   }),
   onDownload: PropTypes.func.isRequired,
+  certificateData: PropTypes.shape({
+    name: PropTypes.string,
+    date: PropTypes.string,
+    courseName: PropTypes.string,
+    signatureImage: PropTypes.string,
+    speakers: PropTypes.arrayOf(PropTypes.shape({
+      name: PropTypes.string,
+      designation: PropTypes.string,
+      image: PropTypes.string,
+    })),
+  }),
 };
 
 const ResourcesAndCertificate = () => {
@@ -589,6 +611,7 @@ const ResourcesAndCertificate = () => {
   const [certificateData, setCertificateData] = useState(null);
   const [userData, setUserData] = useState(null);
   const [resources, setResources] = useState([]);
+  const [speakers, setSpeakers] = useState([]);
   const certificateRef = useRef(null);
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
   const [sessionDetials, setSessionDetials] = useState(null);
@@ -612,7 +635,8 @@ const ResourcesAndCertificate = () => {
       utm_campaign: utmCampaign
     });
   }, [utmSource, utmMedium, utmCampaign, userData?.fields, sessionId, certificateData]);
-
+  console.log(speakers);
+console.log(certificateData);
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -655,10 +679,7 @@ const ResourcesAndCertificate = () => {
           getSessionDetailsAndResources(sessionId),
           getUserDetails(studentId),
         ]);
-         console.log(sessionData?.fields?.session_id !== userDetails?.fields?.session_id_pg?.[0]);
-        // Check if sessioconsn IDs match
-        console.log(userDetails?.fields?.session_id_pg?.[0]);
-        console.log(sessionData?.fields?.session_id);
+
         if (sessionData?.fields?.session_id !== userDetails?.fields?.session_id_pg?.[0]) {
           setShowNotRegisteredDialog(true);
           return;
@@ -669,13 +690,25 @@ const ResourcesAndCertificate = () => {
           setShowFeedbackDialog(true);
           return;
         }
-        console.log(sessionData);
+
+        // Get speaker details
+        const response = await getSessionDetailsAndToolsResources(sessionData?.fields?.session_id);
+        const speakerDetails = response.filter(
+          record => record.fields.type === "Speaker" && record.fields.show === "Yes"
+        );
+        setSpeakers(speakerDetails);
+
         setSessionDetials(sessionData?.fields?.session_id);
         setCertificateData({
           name: `${userDetails?.fields?.student_first_name} ${userDetails?.fields?.student_last_name}`,
           date: sessionData?.fields?.session_start_date,
           courseName: sessionData?.fields?.topic_name,
           signatureImage: sessionData?.fields?.speaker_signature?.[0]?.url || '',
+          speakers: speakerDetails.map(speaker => ({
+            name: speaker.fields.name || '',
+            designation: speaker.fields.designation || '',
+            image: speaker.fields.resources?.[0]?.url || ''
+          }))
         });
 
         setUserData(userDetails);
@@ -695,10 +728,10 @@ const ResourcesAndCertificate = () => {
           topicName: topicName,
           utm_source: utmSource,
           utm_medium: utmMedium,
-          utm_campaign: utmCampaign
+          utm_campaign: utmCampaign,
+          speakerCount: speakerDetails.length
         };
 
-        // Store these in state for use in other event tracking
         setEventProperties(commonEventProperties);
         setResources(sessionData?.fields?.resources || []);
       } catch (err) {
@@ -725,26 +758,39 @@ const ResourcesAndCertificate = () => {
     if (!certificateRef.current) return;
     
     try {
-      const canvas = await html2canvas(certificateRef.current, {
+      const element = certificateRef.current;
+      
+      // Set specific dimensions and scale for better quality
+      const options = {
         scale: 2,
         useCORS: true,
+        allowTaint: true,
         logging: false,
         width: 1000,
         height: 600,
+        windowWidth: 1000,
+        windowHeight: 600,
+        scrollX: 0,
+        scrollY: 0,
+        x: 0,
+        y: 0,
         backgroundColor: '#fff',
-      });
+      };
+      
+      const canvas = await html2canvas(element, options);
       
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
       const pdf = new jsPDF({
         orientation: 'landscape',
         unit: 'px',
-        format: [1000, 600]
+        format: [1000, 600],
+        hotfixes: ['px_scaling']
       });
       
       pdf.addImage(imgData, 'JPEG', 0, 0, 1000, 600);
       pdf.save(`${certificateData.name}_certificate.pdf`);
 
-      // Track certificate download with enhanced properties
+      // Track certificate download event
       trackEvent(EVENTS.CERTIFICATE_DOWNLOADED, {
         user_id: userData?.fields?.student_email_id[0],
         email: userData?.fields?.student_email_id[0],
@@ -925,54 +971,79 @@ const ResourcesAndCertificate = () => {
                 <Box 
                   ref={certificateRef}
                   sx={{ 
-                    width: '100%',
-                    maxWidth: { xs: '100%', md: '1000px' },
+                    width: '1000px',
+                    height: '600px',
                     margin: '0 auto',
                     mb: 3,
-                    overflow: 'auto',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    backgroundColor: '#fff',
+                    borderRadius: '24px',
+                    boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
                     '& > div': {
-                      minWidth: '1000px',
-                      transform: 'none',
-                      transformOrigin: 'center',
+                      width: '1000px !important',
+                      height: '600px !important',
+                      transform: 'none !important',
+                      position: 'relative !important',
+                      left: '0 !important',
+                      top: '0 !important',
+                      margin: '0 !important',
+                      padding: '0 !important',
+                      borderRadius: '24px !important',
+                      overflow: 'hidden !important'
                     }
                   }}
                 >
                   <CertificateTemplate certificateData={certificateData} />
                 </Box>
                 
-                <Box sx={{ 
-                  display: 'flex', 
-                  justifyContent: 'center', 
-                  gap: 2,
-                  flexDirection: { xs: 'column', sm: 'row' },
-                  px: 2,
-                }}>
-                  <Button
-                    variant="contained"
-                    onClick={downloadCertificate}
-                    startIcon={<FileDownloadIcon />}
-                    sx={{
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      py: 1.5,
-                      px: 4,
-                      width: { xs: '100%', sm: 'auto' },
-                      fontSize: { xs: '0.875rem', sm: '1rem' },
-                    }}
-                  >
-                    Download Certificate
-                  </Button>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      textAlign: 'center',
-                      color: 'text.secondary',
-                      display: { xs: 'block', sm: 'none' },
-                      mt: 1
-                    }}
-                  >
-                    Scroll horizontally to view full certificate
-                  </Typography>
+                <Box 
+                  sx={{ 
+                    width: '100%',
+                    overflowX: 'auto',
+                    overflowY: 'hidden',
+                    WebkitPrintColorAdjust: 'exact',
+                    printColorAdjust: 'exact',
+                    '@media print': {
+                      overflow: 'visible'
+                    }
+                  }}
+                >
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    gap: 2,
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    px: 2,
+                    mt: 3
+                  }}>
+                    <Button
+                      variant="contained"
+                      onClick={downloadCertificate}
+                      startIcon={<FileDownloadIcon />}
+                      sx={{
+                        borderRadius: 2,
+                        textTransform: 'none',
+                        py: 1.5,
+                        px: 4,
+                        width: { xs: '100%', sm: 'auto' },
+                        fontSize: { xs: '0.875rem', sm: '1rem' },
+                      }}
+                    >
+                      Download Certificate
+                    </Button>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        textAlign: 'center',
+                        color: 'text.secondary',
+                        display: { xs: 'block', sm: 'none' },
+                        mt: 1
+                      }}
+                    >
+                      Scroll horizontally to view full certificate
+                    </Typography>
+                  </Box>
                 </Box>
               </>
             )}
